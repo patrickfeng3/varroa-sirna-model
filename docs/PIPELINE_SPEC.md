@@ -1,29 +1,27 @@
 # Canonical Varroa vsiRNA Pipeline Specification
 
-**Specification version:** 0.2
-**Status:** Scientific specification prior to canonical implementation
-**Scope:** Validated viral small-RNA analysis through viral spatial/transitivity-consistency analysis
-**Host transitivity:** Excluded
+**Specification version:** 0.3  
+**Status:** Scientific specification before canonical implementation  
+**Scope:** Viral small-RNA analysis through viral spatial/transitivity-consistency analysis  
+**Host transitivity:** Excluded  
 **vdCHIBIN ranking:** Excluded from this build
 
 ---
 
-# 1. Purpose
+## 1. Purpose
 
-This repository contains the canonical, reproducible downstream analysis of *Varroa destructor* viral small-RNA sequencing data.
+This repository will contain the canonical, reproducible downstream analysis of *Varroa destructor* viral small-RNA sequencing data.
 
-The expensive preprocessing, virus discovery, consensus generation and strict mapping stages have already been completed and independently audited.
+The expensive upstream work—read preprocessing, virus discovery, sample-specific consensus generation, strict mapping, and read-level feature extraction—has already been completed and audited. The existing legacy project is therefore treated as a **read-only validated data core**.
 
-The existing legacy project is therefore treated as a **read-only validated data core**.
-
-The canonical repository will regenerate the current biological analyses without unnecessarily repeating the ~60 GB upstream processing.
+The canonical repository must regenerate the biological analyses from frozen inputs without recreating the ~60 GB upstream project.
 
 Conceptual workflow:
 
 ```text
 Validated legacy core
         ↓
-00 Legacy-core validation
+00 Validate legacy core
         ↓
 01 Fixed 23/24-nt populations
         ↓
@@ -31,22 +29,29 @@ Validated legacy core
         ↓
 03 Official stepRNA
         ↓
-04 Dicer-feature analysis
+04 Dicer evidence and Dicer-conditioned features
         ↓
 05 Viral spatial/transitivity-consistency analysis
 ```
 
+A key reproducibility principle is that Stage 05 has two named outputs:
+
+- **historical_v1.4.1_replication** — reproduces the uploaded v1.4.1 algorithm exactly enough to match its archived results.
+- **canonical_transitivity_analysis** — preserves the biological endpoints of v1.4.1 but improves cross-dataset inference by respecting sample-level clustering.
+
+The historical result is a regression target, not an input to the canonical calculation.
+
 ---
 
-# 2. Frozen legacy data core
+## 2. Frozen legacy data core
 
-The external dataset location is supplied locally through:
+The external data location is supplied locally through:
 
 ```text
 config/paths.local.yaml
 ```
 
-Example:
+Current local example:
 
 ```text
 /Users/patrickmod/Desktop/varroa_all_samples_pipeline_v1.0.0
@@ -54,116 +59,74 @@ Example:
 
 This machine-specific path must not be committed to GitHub.
 
-The legacy directory is treated as **read-only**.
+The legacy directory is **read-only**.
 
-## Validated reusable layers
+### Validated reusable layers
 
 The completed audit supports reuse of:
 
-* 21 corrected processed small-RNA FASTQs
-* 21 corrected preprocessing audit records
-* 273 virus-discovery BAMs
-* approved viral reference metadata
-* selected sample-virus manifest
-* sample-specific final viral consensuses
-* sample-specific depth-masked background consensuses
-* 21 competitive exact SAM files
-* 21 competitive one-mismatch SAM files
-* 21 read-level feature tables
-* eligibility and mapping-summary tables
+- 21 corrected processed small-RNA FASTQs;
+- 21 corrected preprocessing audit records;
+- 273 virus-discovery mappings;
+- approved virus metadata and selected sample-virus manifest;
+- sample-specific final viral consensuses;
+- sample-specific depth-masked background consensuses;
+- 21 competitive exact SAM files;
+- 21 competitive one-mismatch SAM files;
+- 21 read-level feature tables;
+- eligibility and mapping-summary tables.
 
-The audit reported:
-
-```text
-21/21 raw FASTQs valid
-21/21 corrected processed FASTQs valid
-273/273 discovery mappings present
-42/42 strict SAMs structurally valid
-21/21 read-level tables valid
-0 warnings
-0 failures
-```
-
-Therefore these expensive layers are frozen unless a later validation identifies a specific problem.
+The canonical pipeline reads these products but does not silently reuse old downstream 23/24, Dicer, or transitivity summaries.
 
 ---
 
-# 3. General statistical principles
+## 3. General analysis principles
 
-These rules apply throughout the canonical pipeline.
+### 3.1 Analysis levels
 
-## Biological clustering
+A **sample** is one sequencing library/sample identifier such as an SRR accession.
 
-Millions of reads from one library are not millions of biological replicates.
+A **sample-virus unit** is one virus analysed within one sample.
 
-Likewise, several virus observations originating from the same sequencing library share:
+A **sample-virus-contig unit** is one mapped viral reference contig within one sample-virus unit. In the archived v1.4.1 transitivity result, each analysed sample-virus unit contributed one analysed contig, but the new implementation must not assume this is universally true.
 
-* the same mite/sample context
-* library preparation
-* sequencing depth
-* technical biases
+Several virus observations from the same sample share the same library context and must not automatically be treated as fully independent biological replicates.
 
-Therefore sample-virus observations from the same sample must not automatically be treated as completely independent replicates.
+### 3.2 Weighting modes
 
-## Primary uncertainty framework
+Two modes are retained and never mixed:
 
-Where cross-library uncertainty is required, the canonical pipeline will use **sample-clustered resampling**.
+**Abundance mode** — a sequence contributes according to its observed read abundance.
 
-Conceptually:
+**Unique-sequence mode** — each distinct RNA sequence contributes total weight 1 within the explicitly defined analysis unit, regardless of how many QNAME/read rows carry that sequence.
 
-```text
-sample
- ├── virus A
- ├── virus B
- └── virus C
-```
+### 3.3 Primary uncertainty framework
 
-The sample is treated as the primary cluster.
+For cross-dataset canonical inference, the top-level resampling cluster is the **sample**.
 
-For statistics calculated at sample-virus level:
+Where a statistic is first computed per sample-virus-contig, the canonical sample-balanced summary is:
 
-1. calculate the required statistic within each sample-virus unit;
-2. preserve those within-sample relationships;
-3. resample samples with replacement;
-4. recompute the overall summary.
+1. calculate the statistic for each eligible sample-virus-contig;
+2. take the median across eligible virus-contigs within each sample;
+3. take the median across sample-level medians;
+4. bootstrap samples with replacement, retaining all observations belonging to a selected sample together.
 
-If additional within-sample resampling is scientifically justified, it must be explicitly documented.
+Historical pair-balanced and virus-balanced summaries are retained as sensitivity/reproduction views.
 
-## Sensitivity analyses
+### 3.4 Randomness
 
-Where useful, additionally report:
+All bootstrap and permutation procedures must record:
 
-* sample-virus pair-balanced summaries
-* biological-virus-balanced summaries
-* leave-one-virus-out results
-* abundance-weighted analyses
-* true unique-sequence analyses
+- seed;
+- number of requested replicates;
+- number of valid replicates;
+- exact aggregation rule.
 
-These are complementary views, not replacements for the sample-aware primary analysis.
+### 3.5 Multiple testing
 
-## Existing mixed models
+The hypothesis family must be defined before interpreting significance.
 
-The corrected legacy pipeline already contains mixed-effects models incorporating sample, biological virus and sample-virus structure.
-
-These may be retained as **secondary inferential/sensitivity analyses** where appropriate.
-
-They do not replace the simpler descriptive and resampling summaries required for the fixed 23/24 analyses.
-
-## Multiple testing
-
-Whenever a family of related hypotheses is tested, the family must be defined before analysis.
-
-Benjamini-Hochberg FDR correction is used for the predefined related tests unless a different correction is explicitly justified.
-
-Both raw and adjusted P-values must be retained.
-
-## Randomness
-
-All bootstrap and permutation procedures must use:
-
-* explicit random seed
-* recorded number of iterations
-* reproducible software implementation
+Historical v1.4.1 FDR adjustment is reproduced exactly in the historical output. The canonical output uses a broader predefined family described in Stage 05 so that analytical choices are not hidden in separate three-test families.
 
 ---
 
@@ -171,9 +134,9 @@ All bootstrap and permutation procedures must use:
 
 ## Purpose
 
-Confirm that the external frozen core still contains all inputs required by the canonical downstream workflow.
+Confirm that the frozen legacy project still contains all files and schemas required by the canonical downstream workflow.
 
-This stage performs no remapping.
+This stage performs no remapping and no biological inference.
 
 ## Required inputs
 
@@ -181,37 +144,27 @@ At minimum:
 
 ```text
 results/descriptive/eligibility.tsv
-
+config/virus_catalog.tsv
 tables/<sample>/<sample>.read_level_features.tsv.gz
-
-references/consensus/
-    <sample>.<virus>.final.fa
-    <sample>.<virus>.final.background_masked.fa
-
-alignments/
-    <sample>.all_viruses.exact.sam
+alignments/<sample>.all_viruses.exact.sam
+references/consensus/<sample>.<virus>.final.fa
+references/consensus/<sample>.<virus>.final.background_masked.fa
 ```
 
-plus relevant:
-
-* sample manifests
-* viral metadata
-* reference locks
-* workflow completion records
+plus the relevant sample/reference manifests and provenance records.
 
 ## Required checks
 
 Confirm:
 
-* expected 21 libraries
-* expected corrected preprocessing provenance
-* expected read-level schemas
-* exact SAM presence and structural validity
-* required sample-virus consensuses
-* depth-masked backgrounds
-* consistent sample names
-* consistent virus names
-* no accidental write path inside `legacy_core`
+- all expected libraries are present;
+- corrected preprocessing provenance is present;
+- required read-level columns exist;
+- exact SAM files are readable and structurally valid;
+- required sample-specific consensuses exist;
+- sample names and virus names agree across inputs;
+- no downstream output path resolves inside the legacy core;
+- frozen input files have recorded identity information such as size and, where practical, checksum.
 
 ## Outputs
 
@@ -223,9 +176,7 @@ results/00_validation/
 
 ## Failure behaviour
 
-Any missing or inconsistent dependency required by a downstream stage causes an explicit failure.
-
-There must be no silent fallback to an older output.
+A missing or inconsistent required dependency causes an explicit failure. There is no silent fallback to an old downstream result.
 
 ---
 
@@ -233,30 +184,24 @@ There must be no silent fallback to an older output.
 
 ## Biological question
 
-What are the abundance, strand distribution and reproducibility of the 23-nt and 24-nt viral small-RNA populations?
+What are the abundance, strand distribution, and cross-sample behaviour of the 23-nt and 24-nt viral small-RNA populations?
 
 ## Inputs
 
-Validated:
+Validated read-level feature tables, eligibility table, and virus metadata.
 
-```text
-read_level_features.tsv.gz
-eligibility.tsv
-viral metadata
-```
-
-No reads are remapped.
+No remapping is performed.
 
 ## Primary inclusion criteria
 
-Use:
+Use reads satisfying the validated equivalents of:
 
 ```text
 mapping_mode = exact
 virus_assignment = assigned
-strand = sense or antisense
 primary_eligible = true
-length = exactly 23 or 24 nt
+length = 23 or 24 nt
+strand = sense or antisense
 ```
 
 Cross-virus ambiguous reads are excluded from virus-specific primary summaries.
@@ -265,71 +210,39 @@ Cross-virus ambiguous reads are excluded from virus-specific primary summaries.
 
 Retain:
 
-* sample
-* virus
-* biological virus
-* viral polarity
-* strand
-* length
-* sequence
-* abundance
-
-## Weighting modes
-
-### Abundance mode
-
-Repeated observations of the same sequence retain their observed abundance.
-
-Question answered:
-
-> What dominates the accumulated sequenced small-RNA population?
-
-### Unique-sequence mode
-
-Within the specified biological analysis unit, each distinct sequence contributes once.
-
-Question answered:
-
-> Is the pattern distributed across many distinct sequence species?
-
-These modes must remain completely separate.
+- sample;
+- analysis unit / virus;
+- biological virus where distinct;
+- viral polarity;
+- strand;
+- length;
+- sequence;
+- abundance.
 
 ## Required summaries
 
-For 23 nt and 24 nt separately:
+For 23 nt and 24 nt separately, calculate:
 
-* total abundance
-* distinct sequence count
-* sense abundance
-* antisense abundance
-* sense fraction
-* antisense fraction
-* pair-level 23:24 relationship
-* cross-sample summary
-
-## Primary uncertainty
-
-Use sample-clustered resampling for across-dataset confidence intervals.
-
-Pair-balanced summaries remain useful descriptive/sensitivity outputs.
+- total abundance;
+- distinct sequence count;
+- sense abundance/count;
+- antisense abundance/count;
+- sense fraction;
+- antisense fraction;
+- pair-level 23:24 relationships;
+- sample-balanced and pair-balanced across-dataset summaries.
 
 ## Outputs
 
 ```text
 results/01_viral_23_24/
+    23_24_counts_by_pair.tsv
+    23_24_fractions_by_pair.tsv
+    23_24_strand_bias_by_pair.tsv
+    23_24_across_samples.tsv
+    23_24_across_pairs.tsv
+    figures/
 ```
-
-including:
-
-```text
-23_24_counts_by_pair.tsv
-23_24_fractions_by_pair.tsv
-23_24_strand_bias_by_pair.tsv
-23_24_across_samples.tsv
-23_24_across_pairs.tsv
-```
-
-and clear descriptive figures.
 
 ---
 
@@ -337,19 +250,17 @@ and clear descriptive figures.
 
 ## Biological question
 
-Do observed Varroa 23- and 24-nt viral small RNAs contain terminal nucleotide patterns more or less frequently than expected from the viral sequence actually available for processing?
+Do observed 23-nt and 24-nt Varroa viral small RNAs contain terminal nucleotide patterns more or less often than expected from the viral sequence actually available for processing?
 
 ## Inputs
 
-* exact eligible 23/24 read-level data
-* sample-specific depth-masked viral consensuses
-* eligibility table
+- exact eligible 23/24 read-level data;
+- sample-specific depth-masked viral consensuses;
+- eligibility table.
 
-The corrected 23/24 implementation already established this matched-background principle.
+## Terminal positions
 
-## Positions
-
-For each physical sequenced RNA:
+For each physical sequenced RNA in its own 5′→3′ orientation:
 
 ```text
 5p1 = first nucleotide
@@ -358,147 +269,67 @@ For each physical sequenced RNA:
 3p1 = final nucleotide
 ```
 
-Terminal bases must refer to the physical sequenced RNA orientation.
-
 ## Observed frequency
 
-For each:
-
-```text
-sample × virus × length × strand × weighting
-```
-
-calculate observed frequencies of:
-
-```text
-A
-C
-G
-U
-```
-
-at each terminal position.
+For each sample × virus × length × strand × weighting mode, calculate the observed A/C/G/U frequency at each terminal position.
 
 ## Expected frequency
 
-Enumerate every fully supported window of the **same length** in the sample-specific depth-masked viral consensus.
+Enumerate every fully supported window of the same length from the sample-specific depth-masked viral consensus.
 
-### Sense
-
-Use reference orientation.
-
-### Antisense
-
-Use the reverse-complement orientation.
-
-### Combined-strand result
-
-Do **not** average sense and antisense expectations 50:50.
-
-Use the observed sense/antisense mixture for that biological unit to weight the two expected backgrounds.
-
-Conceptually:
-
-```text
-expected_combined
-=
-w_sense × expected_sense
-+
-w_antisense × expected_antisense
-```
-
-where the weights correspond to the observed strand mixture for the relevant analysis unit.
+- Sense expectation uses reference orientation.
+- Antisense expectation uses reverse-complement orientation.
+- Combined-strand expectation is weighted by the observed sense/antisense mixture for the corresponding unit; it is not forced to 50:50.
 
 ## Enrichment ratio
 
 ```text
-enrichment_ratio
-=
-observed_fraction
-/
-expected_fraction
+enrichment_ratio = observed_fraction / expected_fraction
 ```
 
 Interpretation:
 
 ```text
-1.0   = observed as often as sequence availability predicts
->1.0  = enriched
-<1.0  = depleted
+1   = observed as often as sequence availability predicts
+>1  = enriched
+<1  = depleted
 ```
 
-## Primary across-dataset summary
+If the expected fraction is zero, the ratio is `NA`; no arbitrary pseudocount is introduced.
 
-For each:
+## Across-dataset summaries
 
-```text
-length
-strand scope
-terminal position
-nucleotide
-weighting mode
-```
+Retain both:
 
-report:
+- historical/pair-level median enrichment across eligible sample-virus units;
+- sample-balanced median of within-sample medians.
 
-* median enrichment
-* sample-aware bootstrap CI
-* number of contributing samples
-* number of contributing sample-virus units
+Confidence intervals for the canonical sample-balanced summary use sample-clustered bootstrap resampling.
 
-The design-facing statistic remains:
+The historical design-facing field `median_enrichment_ratio` remains available for regression comparison and must be clearly labelled if a new sample-balanced field is also exported.
 
-```text
-median_enrichment_ratio
-```
+## 23-versus-24 comparison
 
-## 23-vs-24 comparison
-
-Calculate correlations between the matched 23- and 24-nt enrichment landscapes.
-
-At minimum:
-
-* overall
-* antisense-specific
-
-Use Spearman correlation as the main rank-association summary.
+Use Spearman rank correlation to compare matched 23- and 24-nt enrichment landscapes, including at least overall and antisense-specific comparisons.
 
 ## Outputs
 
 ```text
 results/02_terminal_enrichment/
+    fixed_length_positional_nucleotides_by_pair.tsv
+    fixed_length_positional_nucleotides_across_samples.tsv
+    fixed_length_positional_nucleotides_across_pairs.tsv
+    ALL_VIRUSES_23nt_positional_nucleotide_ratios.tsv
+    ALL_VIRUSES_24nt_positional_nucleotide_ratios.tsv
+    ALL_VIRUSES_23nt_strand_specific_positional_nucleotide_ratios.tsv
+    ALL_VIRUSES_24nt_strand_specific_positional_nucleotide_ratios.tsv
+    23_vs_24_enrichment_correlations.tsv
+    figures/
 ```
-
-including:
-
-```text
-fixed_length_positional_nucleotides_by_pair.tsv
-fixed_length_positional_nucleotides_across_samples.tsv
-fixed_length_positional_nucleotides_across_pairs.tsv
-
-ALL_VIRUSES_23nt_positional_nucleotide_ratios.tsv
-ALL_VIRUSES_24nt_positional_nucleotide_ratios.tsv
-
-ALL_VIRUSES_23nt_strand_specific_positional_nucleotide_ratios.tsv
-ALL_VIRUSES_24nt_strand_specific_positional_nucleotide_ratios.tsv
-
-23_vs_24_enrichment_correlations.tsv
-```
-
-and associated figures.
 
 ## Interpretation limit
 
-This measures empirical enrichment among sequenced Varroa vsiRNAs.
-
-It does not independently distinguish effects caused by:
-
-* Dicer cleavage
-* Ago loading
-* strand selection
-* RNA stability
-* library bias
-* another biological process
+This is an empirical sequence-enrichment measurement. It does not by itself identify whether the preference arose from Dicer cleavage, Argonaute loading, strand selection, RNA stability, library effects, or another process.
 
 ---
 
@@ -506,38 +337,27 @@ It does not independently distinguish effects caused by:
 
 ## Biological question
 
-Do the 23- and/or 24-nt populations show guide/passenger duplex-end geometry consistent with Dicer-like processing?
+Do the 23-nt and/or 24-nt populations show complementary guide/passenger duplex-end geometry consistent with Dicer-like processing?
 
 ## Primary software
 
-Use the **official published stepRNA implementation** as the primary overhang detector.
+Use the official published **stepRNA** implementation as the primary duplex-overhang method.
 
-The previous pipeline-native reconstruction may be retained only as:
+The older project-native reconstruction is retained only for diagnostic comparison and historical validation.
 
-* an independent validation
-* a diagnostic comparison
-* a source for project-specific aggregation
+## Why the full overhang spectrum is analysed
 
-It is not the primary overhang-calling method.
+The analysis does not define Dicer as “2-nt overhang or nothing.” stepRNA reports the full signed 5′ and 3′ overhang/underhang distributions and passenger lengths. The previously observed Varroa +2 5′ / −2 3′ joint geometry is a pre-specified feature of interest within that broader distribution.
 
-## Why analyse the full overhang spectrum
-
-The analysis must not define Dicer processing solely as:
+Official stepRNA sign convention must be preserved:
 
 ```text
-2-nt 3′ overhang = Dicer
-anything else = non-Dicer
+negative distance = reference overhang
+positive distance = reference underhang
+0                 = blunt end
 ```
 
-Instead, official stepRNA is used to examine the complete:
-
-* 5′ overhang/underhang distribution
-* 3′ overhang/underhang distribution
-* passenger-length distribution
-
-The previously observed ~2-nt Dicer-like geometry is a **pre-specified biologically important signature**, but it is evaluated within the complete distribution.
-
-## File A — reference population
+## File A — reference populations
 
 Run separately for:
 
@@ -552,98 +372,46 @@ within each eligible sample-virus unit.
 
 ## File B — potential passengers
 
-Canonical Varroa setting:
+Canonical Varroa project setting:
 
 ```text
 15–30 nt
 ```
 
-from:
+from the same sample and same virus, restricted to the opposite mapped strand relative to File A.
 
-* the same sample
-* the same virus
-* the opposite mapped strand
-
-The opposite-strand restriction is a Varroa project-specific biological filter.
-
-The 15–30-nt range is a project parameter supported by the previous analysis and is also within ranges used in published stepRNA demonstrations.
-
-## Passenger-range sensitivity analysis
-
-Repeat the key population-level conclusions with:
+A pre-specified sensitivity run uses:
 
 ```text
 18–28 nt
 ```
 
-as a sensitivity analysis.
-
-This tests whether the inferred Dicer signal depends strongly on the outer passenger-length boundaries.
-
-The canonical analysis remains 15–30 nt unless results reveal a clear methodological problem.
+because passenger-range choice is an analysis parameter rather than a biological constant.
 
 ## Alignment behaviour
 
-Use official stepRNA's conservative exact reverse-complementary alignment behaviour.
+The canonical run uses official stepRNA exact complementary alignment behaviour. Mismatch-tolerant analyses, if ever performed, are exploratory and separately labelled.
 
-Do not independently introduce mismatches into the canonical run.
+## Collapsed and non-collapsed modes
 
-Any mismatch-tolerant analysis is exploratory and must be separately labelled.
+Retain both official views:
 
-## Collapsed and non-collapsed analysis
+- unique/collapsed reference sequences;
+- non-collapsed/expression-weighted reference sequences.
 
-Run both:
+## Outputs retained
 
-### Collapsed / unique-reference analysis
+Retain official stepRNA outputs including:
 
-Each distinct reference sequence is represented once.
-
-Question:
-
-> Is Dicer-like geometry distributed across diverse sequence species?
-
-### Non-collapsed / expression-weighted analysis
-
-Repeated reference sequences retain abundance.
-
-Question:
-
-> How much of the accumulated sequenced population carries the geometry?
-
-## stepRNA outputs retained
-
-Retain official outputs including:
-
-* complete 5′ overhang/underhang counts
-* complete 3′ overhang/underhang counts
-* unique-overhang counts
-* passenger number
-* passenger length
-* overhang type
-* relevant classified BAMs
-* official enrichment/log-odds statistics
-* official Wald Z-scores
-
-stepRNA calculates enrichment relative to the mean end-distance count and uses Wald Z-scores for its overhang-enrichment inference.
-
-## Canonical pre-specified Varroa signature
-
-The existing Varroa analysis found a joint geometry represented relative to the reference strand as approximately:
-
-```text
-5′: +2 nt underhang
-3′: -2 nt overhang
-```
-
-corresponding to the project label:
-
-```text
-5p_underhang_2__3p_overhang_2
-```
-
-This remains a pre-specified secondary statistic for comparison with previous results.
-
-It does not replace the full official stepRNA distribution.
+- 5′ overhang/underhang counts;
+- 3′ overhang/underhang counts;
+- unique-overhang counts;
+- passenger number;
+- passenger length;
+- overhang type;
+- relevant classified alignment files;
+- official log-ratio/log-odds-style enrichment output as produced by the installed stepRNA version;
+- official Wald Z-scores as produced by stepRNA.
 
 ## Outputs
 
@@ -655,134 +423,75 @@ results/03_steprna/
     sensitivity/
 ```
 
-Summary tables should include:
-
-```text
-steprna_overhang_by_pair.tsv
-steprna_unique_overhang_by_pair.tsv
-steprna_passenger_length_by_pair.tsv
-steprna_canonical_signature_by_pair.tsv
-steprna_23_vs_24_summary.tsv
-```
-
 ## Interpretation limit
 
-A reproducible enriched duplex-end geometry supports Dicer/Dicer-like processing.
-
-The analysis does not:
-
-* directly observe intact biological duplexes
-* identify the responsible Dicer paralogue
-* prove every RNA of that length was produced by Dicer
-
-Failure to recover a passenger is weaker evidence than successful recovery because passenger strands can disappear during small-RNA maturation.
+A reproducibly enriched duplex-end geometry is evidence consistent with Dicer/Dicer-like cleavage. It does not directly observe intact duplexes in vivo, identify a specific Dicer paralogue, or prove that every RNA of that length was Dicer-generated.
 
 ---
 
 # 04 — Dicer evidence aggregation and Dicer-conditioned sequence features
 
-This stage has two separate purposes.
-
----
+This stage has two distinct purposes and keeps them separate.
 
 ## 04A — Population-level Dicer evidence
 
 ### Question
 
-How reproducible is the stepRNA Dicer-like signal across the Varroa dataset, and how does the signal compare between 23 and 24 nt?
+How reproducible is the stepRNA Dicer-like signal across the Varroa dataset, and how do 23- and 24-nt populations compare?
 
 ### Primary input
 
-Official stepRNA results from Stage 03.
+Official stepRNA outputs from Stage 03.
 
-### Primary summaries
+### Required summaries
 
-For each sample-virus unit and for each:
+For each sample-virus unit and File-A class, retain:
 
-```text
-23 sense
-23 antisense
-24 sense
-24 antisense
-```
+- complete 5′ distance distribution;
+- complete 3′ distance distribution;
+- official stepRNA enrichment/Z-score outputs;
+- passenger recovery fraction;
+- passenger-length distribution;
+- support for the pre-specified Varroa +2 5′ / −2 3′ joint geometry.
 
-retain:
+### Passenger recovery versus geometry
 
-* dominant 5′ distance
-* dominant 3′ distance
-* stepRNA Z-score
-* canonical 2-nt support
-* fraction with predicted passenger
-* passenger-length profile
+These are reported separately.
 
-### Sample-aware aggregation
+A low fraction of references with any recoverable passenger does not equal absence of Dicer processing. Among references with a recovered passenger, the geometry distribution is reported independently.
 
-Calculate sample-level summaries first where multiple viruses occur within one sample.
+### Project-specific secondary statistic
 
-Use sample-clustered resampling for primary confidence intervals.
-
-### 23-versus-24 comparison
-
-Calculate paired differences wherever both populations are available within the same biological unit.
-
-Then aggregate these differences with sample clustering preserved.
-
-### Existing custom statistic
-
-The previous analysis used:
+The historical project statistic `Δ_Dicer` may be reproduced as a secondary validation statistic:
 
 ```text
-Δ_Dicer
-=
-support at the pre-specified Dicer distance
-−
-mean support at alternative tested distances
+Δ_Dicer = support at a pre-specified Dicer-compatible distance
+          - mean support across a pre-specified comparison-distance set
 ```
 
-This may be retained as a **secondary project-specific validation statistic**.
+The comparison-distance set must be defined in configuration before examining results.
 
-It must always be labelled:
+`Δ_Dicer` is not an official stepRNA statistic.
 
-```text
-custom Varroa summary statistic
-```
+### Aggregation
 
-rather than an official stepRNA statistic.
+Canonical confidence intervals use sample-aware aggregation/resampling. Pair-balanced and virus-balanced views are retained as sensitivity summaries.
 
-### Sensitivity outputs
-
-Also report:
-
-* pair-balanced summaries
-* virus-balanced summaries
-* leave-one-virus-out where informative
-* 15–30 versus 18–28 passenger-range comparison
-
----
-
-## 04B — Dicer-conditioned sequence-feature analysis
+## 04B — Dicer-conditioned sequence features
 
 ### Question
 
-Do small RNAs with strong Dicer-like support have sequence features that are different from the general 23/24 small-RNA population?
+Do RNAs with strong pre-specified Dicer-like geometry have terminal sequence features that differ from the general 23/24 population?
 
-This is the analysis that could eventually justify an additional candidate-ranking metric.
+### Primary Dicer-supported subset
 
-### Pre-specified Dicer-supported subset
+Use the pre-specified Varroa joint geometry rather than selecting whichever overhang distance happens to maximize enrichment in the same dataset.
 
-For the first canonical analysis, use a pre-specified Dicer-compatible geometry based on the prior Varroa result rather than selecting whichever distance happens to maximize enrichment in the same dataset.
+Other reproducibly enriched geometries may be explored but are labelled exploratory until independently justified.
 
-Primary strong subset:
+### Initial features
 
-```text
-canonical joint 2-nt geometry
-```
-
-Additional subsets based on other reproducibly enriched stepRNA peaks may be explored but must be labelled exploratory until independently validated.
-
-### Features examined initially
-
-Pre-specify a limited feature set:
+Pre-specify:
 
 ```text
 5p1
@@ -794,198 +503,181 @@ reference strand
 passenger length
 ```
 
-Additional sequence features should be added only with clear biological justification.
-
 ### Absolute Dicer-conditioned enrichment
 
-For a sequence feature:
-
 ```text
-E_Dicer_absolute
-=
-frequency among Dicer-supported RNAs
-/
-viral-sequence expected frequency
+E_Dicer_absolute = frequency among Dicer-supported RNAs
+                   / matched viral-sequence expected frequency
 ```
-
-This asks:
-
-> What features characterize the Dicer-supported subset relative to sequence availability?
 
 ### Dicer-specific contrast
 
-Also calculate:
-
 ```text
-Dicer_specific_contrast
-=
-E_Dicer_absolute
-/
-E_all_observed
+dicer_specific_log2_contrast
+    = log2(E_Dicer_absolute / E_all_observed)
 ```
 
-where:
+where `E_all_observed` is the matching general enrichment from Stage 02.
 
-```text
-E_all_observed
-```
+This asks whether Dicer-supported RNAs contain information beyond the general sequence preference already seen among all siRNAs.
 
-is the general enrichment from Stage 02 for the same:
-
-* length
-* strand
-* position
-* nucleotide
-* biological unit
-
-This asks the more useful question:
-
-> Is this feature specifically associated with the Dicer-supported subset beyond the nucleotide preference already present in all observed siRNAs?
-
-Interpretation:
-
-```text
-≈1
-Dicer-supported RNAs do not add much information beyond general enrichment
-
->1
-feature is more strongly represented among Dicer-supported RNAs
-
-<1
-feature is less represented among Dicer-supported RNAs
-```
-
-### Stratification
-
-Do not pool 23 and 24 nt.
-
-Do not pool sense and antisense before the strand-specific analysis.
-
-Passenger recovery differs between strand-biased populations, particularly the strongly antisense-biased 24-nt class.
+Undefined or zero cases that make the logarithm invalid are reported as `NA`; arbitrary pseudocounts are not introduced merely to force finite values.
 
 ### Redundancy test
 
-Quantify correlation between:
+Quantify the relationship between general terminal enrichment and Dicer-conditioned enrichment. A strongly redundant Dicer-derived signal should not later be treated as an independent candidate-scoring dimension without justification.
 
-```text
-general enrichment metric
-```
-
-and:
-
-```text
-Dicer-specific metric
-```
-
-If the new Dicer metric is highly redundant with the existing enrichment metric, it must not later be treated as an independent scoring feature without justification.
-
-### Outputs
+## Outputs
 
 ```text
 results/04_dicer_features/
-```
-
-including:
-
-```text
-dicer_population_summary_by_pair.tsv
-dicer_population_summary_by_sample.tsv
-dicer_23_vs_24.tsv
-dicer_passenger_length_summary.tsv
-dicer_conditioned_terminal_features.tsv
-dicer_specific_contrasts.tsv
-dicer_vs_general_enrichment.tsv
-dicer_sensitivity_summary.tsv
+    dicer_population_summary_by_pair.tsv
+    dicer_population_summary_by_sample.tsv
+    dicer_23_vs_24.tsv
+    dicer_passenger_length_summary.tsv
+    dicer_conditioned_terminal_features.tsv
+    dicer_specific_contrasts.tsv
+    dicer_vs_general_enrichment.tsv
+    dicer_sensitivity_summary.tsv
+    figures/
 ```
 
 ---
 
 # 05 — Viral spatial/transitivity-consistency analysis
 
-## Biological question
+## 05.1 Biological question
 
-Is the secondary-associated 24-nt antisense population spatially related to primary-like 23-nt processing in a pattern consistent with secondary/transitive RNAi?
+Is the 24-nt antisense population spatially related to primary-like 23-nt processing in a pattern **consistent with** secondary/transitive amplification?
 
-Because these are natural viral infections, this stage is deliberately called:
+This is an observational analysis of natural viral infections. Viral replication can itself create spatially structured complementary RNA, so the result cannot by itself prove RdRP-mediated transitivity.
 
-> **viral spatial/transitivity-consistency analysis**
+## 05.2 Audited historical reference implementation
 
-rather than proof of transitivity.
-
-Viral replication itself can produce complementary RNA substrates and therefore complicates mechanistic interpretation.
-
----
-
-# 05A — Coordinate reconstruction and QC
-
-## Inputs
-
-Use existing:
+The exact uploaded v1.4.1 reference package is:
 
 ```text
-exact competitive SAMs
-read-level feature tables
-eligibility table
-viral polarity metadata
-final viral references
+Varroa_vsiRNA_v1.4.1_strengthened_transitivity/
+    analysis_tools/analyse_strengthened_transitivity.py
+    tests/test_strengthened_transitivity.py
+    docs/ACADEMIC_BASIS_AND_INTERPRETATION.md
+    run_strengthened_transitivity.py
 ```
 
-No remapping.
-
-## Required reconstruction
-
-For every selected exact 23/24-nt read:
-
-recover:
-
-* sample
-* assigned virus
-* strand
-* genomic coordinate
-* sequence
-* length
-* mapping location information
-
-## QC
-
-Report:
-
-* total selected reads
-* successfully coordinate-recovered reads
-* distinct recovered sequences
-* strand mismatches
-* sequence mismatches
-* metadata conflicts
-* missing alignments
-
-The previous strengthened run recovered all selected reads with no strand or metadata conflicts; the canonical pipeline should independently verify this rather than hard-code the result.
-
----
-
-# 05B — Eligible viral units
-
-The directional analysis is restricted to suitable positive-sense viral genomes for which upstream/downstream interpretation is biologically defined in a consistent reference orientation.
-
-The canonical pipeline must write the exact eligible set to:
+The corresponding archived result package is:
 
 ```text
-eligible_positive_sense_units.tsv
+Varroa_v1.4.1_strengthened_transitivity_results/
 ```
 
-The previous strengthened analysis contained:
+The canonical repository must preserve these packages outside the executable workflow or document their checksums/provenance so that the historical algorithm is auditable.
+
+## 05.3 Historical v1.4.1 default parameters
+
+Exact defaults recovered from code:
 
 ```text
-14 samples
-19 positive-sense sample-virus units
+bin_size_nt              = 10
+max_crosscorr_lag_nt     = 500
+windows_nt               = [100, 250, 500]
+anchor_percentile        = 90.0
+anchor_min_separation_nt = 50
+minimum_anchors          = 3
+permutations             = 5000
+bootstrap_replicates     = 5000
+random_seed              = 20260810
 ```
 
-but the new implementation must derive this from the validated metadata.
+These values are historical analysis parameters, not biological constants.
 
----
+## 05.4 Eligible viral units
 
-# 05C — Spatial tracks
+Use sample-virus units that are:
 
-Construct position-wise tracks for:
+- `primary_eligible = true`; and
+- classified as positive-sense RNA viruses by the validated virus catalogue.
+
+The historical result contained 14 samples, 19 positive-sense sample-virus units, and three analysis units/viruses contributing to the final transitivity summaries. The new workflow must derive these counts from the frozen inputs rather than hard-code them.
+
+## 05.5 Read selection
+
+Within eligible units, select reads satisfying the validated equivalents of:
+
+```text
+mapping_mode = exact
+virus_assignment = assigned
+length = 23 or 24 nt
+strand = sense or antisense
+```
+
+## 05.6 Coordinate recovery from exact SAM files
+
+Coordinates are recovered from the frozen exact competitive SAM files; reads are not remapped.
+
+Historical parser behaviour:
+
+- unmapped records are excluded;
+- supplementary records are excluded;
+- all retained exact compatible loci are available for fractional multimapper handling;
+- strand mismatches are counted diagnostically.
+
+Canonical behaviour strengthens QC:
+
+- a metadata conflict causes explicit exclusion and reporting;
+- any non-zero strand mismatch causes Stage 05 QC failure unless a documented cause is resolved;
+- duplicate alignment records for the same physical locus are deduplicated before weighting.
+
+## 05.7 Positional coordinate used for each small RNA
+
+The historical analysis uses the alignment midpoint:
+
+```text
+midpoint_nt = alignment_start_0based + (read_length - 1) / 2
+```
+
+The midpoint is assigned to a 10-nt bin:
+
+```text
+bin_index = floor(midpoint_nt / 10)
+```
+
+This midpoint/bin convention is retained in both historical replication and canonical analysis.
+
+## 05.8 Abundance track construction
+
+For one QNAME/read with observed abundance `a` and `k` unique exact compatible loci:
+
+```text
+weight per locus = a / k
+```
+
+Thus the QNAME contributes total abundance `a` across all of its exact compatible positions rather than `a` at every locus.
+
+Canonical code requires the SAM strand to match the read metadata strand before a locus is accepted.
+
+## 05.9 True unique-sequence track construction
+
+Define sequence identity by:
+
+```text
+virus × strand × length × sequence
+```
+
+All QNAMEs carrying that same physical RNA sequence are collapsed.
+
+If the sequence has `k` unique exact compatible loci across the analysed reference contigs:
+
+```text
+weight per locus = 1 / k
+```
+
+Therefore each distinct sequence contributes **total weight exactly 1**, regardless of read abundance or number of QNAME rows.
+
+This is the corrected v1.4.1 unique-sequence definition and must be explicitly tested.
+
+## 05.10 Position-wise tracks
+
+For each sample-virus-contig and weighting mode, construct 10-nt binned tracks:
 
 ```text
 23 sense
@@ -994,499 +686,503 @@ Construct position-wise tracks for:
 24 antisense
 ```
 
-for each eligible sample-virus unit.
+## 05.11 Primary-like 23-nt anchor scores
 
-Maintain separate:
+Two predefined anchor signals are analysed separately.
 
-* abundance tracks
-* true unique-sequence tracks
-
-## True unique-sequence requirement
-
-A unique-sequence analysis must genuinely deduplicate sequence identities at the defined analysis level.
-
-It must not reproduce the earlier error where a nominal unique-sequence mode remained effectively read-weighted.
-
----
-
-# 05D — Primary-like 23-nt anchor tracks
-
-Maintain the two established anchor concepts.
-
-## `balanced23`
+### `balanced23_anchor_score`
 
 ```text
-balanced23
-=
-sqrt(23_sense × 23_antisense)
+balanced23 = sqrt(23S × 23AS)
 ```
 
-This preferentially identifies positions/regions with evidence from both strands.
+A high value requires signal from both strands.
 
-## `combined23`
+### `combined23_anchor_score`
 
 ```text
-combined23
-=
-23_sense + 23_antisense
+combined23 = 23S + 23AS
 ```
 
-This is a broader measure of local 23-nt activity.
+This measures total local 23-nt activity without requiring strand balance.
 
-They remain separate analyses.
+Neither score proves that a locus is biologically primary; they define **primary-like spatial anchors** for this analysis.
 
----
+## 05.12 Exact historical anchor selection
 
-# 05E — Implementation lock before Stage 05 coding
+For each binned anchor-score track:
 
-The archived project documentation confirms the final v1.4.1 endpoints and statistical safeguards, but the currently recovered documentation does **not specify with sufficient precision**:
+1. keep bins with score > 0;
+2. if fewer than `minimum_anchors` non-zero bins exist, the unit is ineligible for that anchor analysis;
+3. calculate the 90th percentile **only across non-zero bins**;
+4. candidate anchors are non-zero bins with score at or above that threshold;
+5. rank candidates from strongest score to weakest;
+6. greedily retain a candidate only if it is at least 50 nt from all already chosen anchors;
+7. after selection, require at least three anchors.
 
-1. the exact hotspot/anchor-selection algorithm;
-2. the exact threshold used to call a hotspot;
-3. whether neighbouring anchor positions were merged and how;
-4. the exact treatment of within-virus positional multimappers;
-5. the exact boundary behaviour of the positional-shift null;
-6. the exact family of tests used for the previous BH correction.
+The historical code has no separate hotspot-merging step.
 
-These details must **not be guessed**.
+Canonical code must make tie-breaking deterministic: equal-score candidates are ordered by genomic coordinate after score ranking.
 
-Before implementing Stage 05, recover the final v1.4.1 script/result package and lock these definitions into this specification.
+## 05.13 Exact upstream/downstream window calculation
 
-Until this is done:
+For each selected anchor and window `W ∈ {100, 250, 500}` nt:
+
+- convert `W` to 10-nt bins;
+- exclude the anchor bin itself;
+- collect available downstream bins and upstream bins separately;
+- truncate naturally at reference boundaries;
+- calculate mean signal per valid bin.
+
+Historical pooled mean:
 
 ```text
-Stage 05 scientific logic = specified
-Stage 05 exact implementation = NOT YET LOCKED
+mean_downstream = sum(signal over all anchor-specific downstream bins)
+                  / total number of valid downstream bin observations
+
+mean_upstream   = sum(signal over all anchor-specific upstream bins)
+                  / total number of valid upstream bin observations
 ```
 
-This is an intentional reproducibility safeguard.
+If neighbourhoods around different anchors overlap, a genomic bin can contribute once for each anchor neighbourhood that contains it. Therefore the historical statistic is an **anchor-window pooled mean density**, not the mean over unique genomic territory.
 
-## If the final v1.4.1 implementation cannot be recovered
+This property is retained for historical replication and explicitly documented in canonical outputs.
 
-A new prospective method must be defined explicitly before looking at new results.
+## 05.14 Normalized 24-nt directionality
 
-A conservative option could then use:
-
-* unique-position mappings as the primary spatial analysis
-* multimappers as a sensitivity analysis
-* a pre-specified hotspot threshold
-* a pre-specified merging rule
-* a pre-specified permutation boundary rule
-
-However, this would constitute a **new method**, not a reconstruction of v1.4.1, and must be labelled accordingly.
-
----
-
-# 05F — Canonical distances
-
-Retain the previously tested distances:
+For a strand-specific 24-nt track:
 
 ```text
-100 nt
-250 nt
-500 nt
+D = (mean_downstream - mean_upstream)
+    / (mean_downstream + mean_upstream)
 ```
 
-These are the confirmatory canonical windows.
+If the denominator is zero or the required means are not finite, `D = NA`.
 
-Any additional distance is exploratory unless separately pre-specified before examining results.
-
----
-
-# 05G — Primary endpoint: antisense-specific directionality
-
-Define downstream-minus-upstream signal for each 24-nt strand.
-
-Then use:
+Calculate:
 
 ```text
-D_24AS − D_24S
+D_24AS = normalized directionality of 24-nt antisense
+D_24S  = normalized directionality of 24-nt sense
 ```
 
-where:
+Primary directionality contrast:
 
 ```text
-D_24AS =
-24AS_downstream − 24AS_upstream
-
-D_24S =
-24S_downstream − 24S_upstream
+antisense_specific_directionality = D_24AS - D_24S
 ```
 
-Purpose:
+A positive value means 24-AS is more downstream-biased than the 24-S control track.
 
-> test whether downstream behaviour is specifically stronger for the antisense 24-nt population rather than reflecting a generic directional property of the viral genome.
+## 05.15 Antisense 23→24 composition endpoint
 
----
-
-# 05H — Composition endpoint
-
-Define:
+Using the anchor-window pooled mean densities:
 
 ```text
-F24_AS
-=
-24AS
-/
-(23AS + 24AS)
+F24_AS_down
+    = mean24AS_down / (mean23AS_down + mean24AS_down)
+
+F24_AS_up
+    = mean24AS_up / (mean23AS_up + mean24AS_up)
 ```
 
-Then:
+If a denominator is zero, the corresponding fraction is `NA`.
+
+The composition shift is:
 
 ```text
-ΔF24_AS
-=
-F24_AS_downstream
-−
-F24_AS_upstream
+delta_F24_AS = F24_AS_down - F24_AS_up
 ```
 
-This asks:
+A positive value means that, among antisense 23+24-nt signal, the downstream neighbourhood is relatively more 24-nt dominated than the upstream neighbourhood.
 
-> Does the downstream antisense population become relatively more 24-nt dominated?
+This is a composition statistic. It does not necessarily imply an increase in total small-RNA abundance.
 
-## Zero-denominator rule
+## 05.16 Historical circular-shift null
 
-If:
+For each sample-virus-contig, weighting mode, anchor definition, and window:
+
+- keep the 23-nt tracks and anchors fixed;
+- shift the entire 24-AS track and 24-S track by the **same randomly selected circular shift**;
+- recompute `antisense_specific_directionality` and `delta_F24_AS`;
+- repeat 5000 times by default.
+
+Using the same shift for 24-AS and 24-S preserves their mutual spatial relationship while disrupting their registration relative to the 23-nt anchors.
+
+Allowed historical shifts are non-zero circular shifts satisfying:
 
 ```text
-23AS + 24AS = 0
+min(shift_bins, n_bins - shift_bins) > max_window_bins
 ```
 
-then:
+where `max_window_bins = 500 / 10 = 50` under default settings.
+
+Thus shifts within 500 nt of zero in either circular direction are excluded when possible.
+
+If no such shifts exist for a short reference, the historical function falls back to **all non-zero circular shifts**. The canonical replication must report whenever this fallback occurs.
+
+For each permutation index, different contigs may receive different randomly drawn allowed shifts; higher-level null statistics are then calculated by aggregating the same permutation index across contigs.
+
+## 05.17 Historical empirical permutation P-value
+
+For the one-sided hypothesis that the observed statistic is greater than expected under the shift null:
 
 ```text
-F24_AS = NA
+p = (1 + number of null statistics >= observed statistic)
+    / (1 + number of valid null statistics)
 ```
 
-There is no biological composition to estimate.
+The tail direction is fixed in advance.
 
-Do not generate a 0.5 value using a pseudocount.
+## 05.18 Historical pair-balanced aggregation
 
----
-
-# 05I — Aggregation
-
-Primary inference must preserve sample clustering.
-
-Report:
-
-### Primary
-
-* sample-aware/clustered summary
-
-### Sensitivity
-
-* sample-virus pair-balanced
-* biological-virus-balanced
-* abundance mode
-* unique-sequence mode
-* balanced23 anchors
-* combined23 anchors
-
----
-
-# 05J — Leave-one-virus-out analysis
-
-Repeat the relevant higher-level summary while omitting each biological virus in turn.
-
-Purpose:
-
-> determine whether one virus is responsible for the overall result.
-
-This is a robustness analysis, not a replacement for the primary estimate.
-
----
-
-# 05K — Permutation null
-
-Preserve the established principle that:
+For a fixed:
 
 ```text
-24 sense
-and
-24 antisense
+weighting × anchor definition × window
 ```
 
-must move together under the spatial null.
+v1.4.1 takes the median of the finite sample-virus-contig statistics.
 
-This preserves their internal strand relationship while disrupting their positional relationship with the 23-nt anchor structure.
+This is called **pair-balanced** in the archived package because each eligible row contributes comparably rather than being weighted by sequencing depth.
 
-The exact positional-shift implementation and boundary behaviour must be recovered from v1.4.1 before coding.
+The historical bootstrap independently resamples those rows with replacement and recalculates the median.
 
-Record:
+This historical bootstrap does **not** preserve sample clustering and is retained only for exact reproduction/sensitivity.
 
-* random seed
-* number of permutations
-* valid permutations
-* observed statistic
-* empirical P-value
+## 05.19 Historical virus-balanced aggregation
 
----
+For each biological analysis unit/virus:
 
-# 05L — Multiple testing
+1. calculate the median across its eligible sample-virus-contigs;
+2. calculate the median across virus medians.
 
-Use BH-FDR correction over the pre-specified confirmatory test family.
+The historical hierarchical bootstrap resamples viruses and then observations within selected viruses.
 
-The exact family used in the reconstructed v1.4.1 analysis must be recovered before implementation.
+This is a robustness view intended to reduce domination by a virus represented in many samples. With few viruses, its uncertainty must be interpreted cautiously.
 
-Do not choose the FDR family after inspecting which tests are significant.
+## 05.20 Canonical sample-balanced aggregation
 
-Retain:
+This is the primary cross-dataset aggregation for the new canonical analysis.
+
+For every fixed weighting × anchor × window × endpoint:
+
+1. calculate the endpoint for each eligible sample-virus-contig;
+2. within each sample, take the median across its finite virus-contig endpoint values;
+3. take the median across sample-level medians.
+
+### Canonical confidence interval
+
+Bootstrap the sample IDs with replacement. When a sample is selected, retain all of its eligible virus-contig observations together, recompute its within-sample median, and then recompute the across-sample median.
+
+### Canonical permutation null
+
+For each permutation index:
+
+1. apply the v1.4.1 same-shift 24S/24AS null independently within each contig;
+2. calculate the endpoint per contig;
+3. collapse contig endpoints to a median within each sample;
+4. take the median across samples.
+
+The empirical P-value uses the same `(b+1)/(m+1)` one-sided formula.
+
+This retains the v1.4.1 spatial null while preventing samples containing multiple eligible viruses from acting like multiple independent samples at the final aggregation level.
+
+## 05.21 Multiple testing
+
+### Historical replication
+
+Reproduce v1.4.1 exactly: BH adjustment across the three windows `100/250/500 nt`, separately for each:
 
 ```text
-raw P
-BH-adjusted P
-effect size
-uncertainty interval
+weighting × anchor definition × endpoint × aggregation type
 ```
 
----
+Thus each historical BH family contains three P-values.
 
-# 05M — Required outputs
+### Canonical inference
+
+For the primary sample-balanced analysis, define one confirmatory family per biological endpoint across all predefined combinations:
 
 ```text
-results/05_viral_transitivity/
+2 weighting modes × 2 anchor definitions × 3 windows = 12 tests
 ```
 
-including:
+The two endpoint families are:
+
+- `delta_F24_AS`;
+- `antisense_specific_directionality`.
+
+Apply BH separately to those two 12-test families.
+
+Pair-balanced, virus-balanced, leave-one-virus-out, cross-correlation, and any future parameter-sensitivity analyses are robustness/descriptive outputs rather than extra routes to a primary claim.
+
+## 05.22 Leave-one-virus-out robustness
+
+For each weighting × anchor × window, omit each virus in turn and recalculate the pair-level observed medians.
+
+The canonical pipeline may additionally report sample-balanced leave-one-virus-out summaries, but these are sensitivity analyses rather than a new confirmatory family.
+
+## 05.23 Descriptive cross-correlation
+
+Cross-correlation is retained as spatial description, not primary transitivity evidence.
+
+Historical implementation:
+
+- transform anchor and 24-nt tracks with `log1p`;
+- evaluate lags from −500 to +500 nt in 10-nt steps;
+- positive lag means the 24-nt target track is displaced downstream relative to the 23-nt anchor track;
+- calculate Pearson correlation at each lag where at least 10 overlapping bins exist and both vectors have non-zero variance.
+
+A lag-asymmetry summary compares mean positive-lag correlation with mean negative-lag correlation for each 24-nt strand, then compares antisense minus sense.
+
+Zero-lag co-localisation alone is not interpreted as transitivity.
+
+## 05.24 Historical regression checkpoints
+
+The historical replication should match the archived v1.4.1 results to numerical tolerance.
+
+Important diagnostic checkpoints include:
 
 ```text
-coordinate_qc.tsv
-eligible_positive_sense_units.tsv
-
-spatial_tracks/
-anchor_summary.tsv
-
-transitivity_by_pair.tsv
-transitivity_by_sample.tsv
-
-sample_clustered_results.tsv
-pair_balanced_results.tsv
-virus_balanced_results.tsv
-
-leave_one_virus_out.tsv
-permutation_results.tsv
-multiple_testing_summary.tsv
-
-final_transitivity_summary.tsv
+14 samples in coordinate diagnostics
+19 eligible positive-sense sample-virus units
+0 metadata conflicts
+0 strand mismatches
 ```
 
-plus figures.
+For `unique_sequence × balanced23`, archived pair-balanced `delta_F24_AS` values are approximately:
 
----
+```text
+100 nt  = -0.000113
+250 nt  = +0.002682
+500 nt  = +0.003662
+```
 
-# 05N — Interpretation limits
+with archived pair-level BH-adjusted values approximately:
+
+```text
+100 nt  = 0.471706
+250 nt  = 0.018596
+500 nt  = 0.000600
+```
+
+The corresponding archived `antisense_specific_directionality` results are not significant and are near zero/negative rather than showing a convincing absolute downstream 24-AS wave.
+
+These numbers are **regression checkpoints only**. They are never loaded as inputs to the new analysis.
+
+## 05.25 Interpretation rule
 
 The viral analysis may support statements such as:
 
-* 23/24 spatial co-localization
-* downstream/upstream asymmetry
-* an antisense-specific directional effect
-* a shift in antisense composition toward 24 nt
-* consistency with secondary/amplification-associated biology
+- 23- and 24-nt spatial association;
+- downstream/upstream asymmetry;
+- an antisense-specific directional effect if present;
+- a downstream shift in antisense 23/24 length composition;
+- consistency with secondary/amplification-associated biology.
 
 It must not by itself establish:
 
-* that every 23-mer is primary
-* that every 24-mer is secondary
-* that RdRP directly synthesizes 24-mers
-* that 24-mers are Dicer-independent
-* a universal secondary propagation distance
-* a specific Dicer/Ago/RdRP paralogue
-* host-mRNA transitivity
+- that every 23-mer is primary;
+- that every 24-mer is secondary;
+- that RdRP directly synthesizes 24-mers;
+- that 24-mers are Dicer-independent;
+- a universal propagation distance;
+- a specific Dicer/Ago/RdRP paralogue;
+- host-mRNA transitivity.
+
+## 05.26 Required outputs
+
+```text
+results/05_viral_transitivity/
+    coordinate_qc.tsv
+    eligible_positive_sense_units.tsv
+    historical_v1.4.1_replication/
+        transitivity_by_pair.tsv
+        pair_balanced_results.tsv
+        virus_balanced_results.tsv
+        leave_one_virus_out.tsv
+        cross_correlation.tsv
+        regression_check.tsv
+    canonical_transitivity_analysis/
+        transitivity_by_pair.tsv
+        transitivity_by_sample.tsv
+        sample_balanced_results.tsv
+        pair_balanced_sensitivity.tsv
+        virus_balanced_sensitivity.tsv
+        leave_one_virus_out.tsv
+        multiple_testing_summary.tsv
+        final_transitivity_summary.tsv
+    figures/
+```
 
 ---
 
-# 6. Reproducibility requirements
+## 6. Reproducibility requirements
 
-## External data
+All new outputs are written under `results/` in the canonical repository.
 
-The validated legacy core remains read-only.
-
-## New results
-
-All new files must be written under:
-
-```text
-results/
-```
-
-inside the canonical Git project.
-
-## Configuration
-
-Analysis parameters should live in configuration rather than being hidden inside scripts.
-
-At minimum record:
+Configuration must record at minimum:
 
 ```text
 target_lengths = [23, 24]
-
 steprna_passenger_range = [15, 30]
 steprna_sensitivity_range = [18, 28]
-
-transitivity_distances = [100, 250, 500]
-
-bootstrap_iterations
-permutation_iterations
-random_seed
+transitivity_bin_size_nt = 10
+transitivity_windows_nt = [100, 250, 500]
+transitivity_anchor_percentile = 90
+transitivity_anchor_min_separation_nt = 50
+transitivity_min_anchors = 3
+transitivity_permutations = 5000
+bootstrap_replicates = 5000
+random_seed = 20260810
 ```
 
-Once recovered, also record:
+Each run records:
 
-```text
-hotspot threshold
-anchor merge rule
-multimapper policy
-permutation boundary rule
-FDR test family
-```
+- pipeline Git commit;
+- configuration file;
+- software versions;
+- legacy-core path;
+- input identity/checksums where practical;
+- run date;
+- random seed.
 
-## Software versions
-
-Record exact versions of:
-
-* Python
-* Snakemake
-* stepRNA
-* Bowtie2 used internally by stepRNA
-* pysam
-* pandas
-* numpy
-* scipy
-* statistical packages
-* plotting packages
-
-Only software actually used by this downstream build needs to be installed.
-
-## Provenance
-
-Each run should record:
-
-* pipeline Git commit
-* configuration
-* software versions
-* legacy-core path
-* relevant input-file identity
-* run date
-* random seed
+Relevant software versions include Python, Snakemake, stepRNA, Bowtie2 used by stepRNA, pysam, NumPy, pandas, SciPy, and plotting/statistical packages actually used.
 
 ---
 
-# 7. Required tests
+## 7. Required deterministic tests
 
-Deterministic tests should cover at least:
+### Stage 02
 
-## Terminal enrichment
+- 5p1/5p2/3p2/3p1 extraction;
+- reverse-complement antisense expectation;
+- strand-weighted combined expectation;
+- zero expected frequency → `NA`.
 
-* 5p1 extraction
-* 5p2 extraction
-* 3p2 extraction
-* 3p1 extraction
-* reverse-complement antisense expectation
-* observed-strand-weighted combined expectation
+### Stage 03–04
 
-## Unique-sequence logic
+- correct File-A class;
+- opposite-strand File-B selection;
+- passenger-length filters;
+- official stepRNA sign convention;
+- parsing of official stepRNA outputs;
+- separate passenger recovery and geometry denominators.
 
-* repeated sequence counted once
-* different sequences counted separately
-* abundance mode unchanged
+### Stage 05 coordinate and weighting logic
 
-## Dicer analysis
+- alignment midpoint calculation;
+- 10-nt bin assignment;
+- QNAME abundance split across `k` loci sums to original abundance;
+- duplicate QNAME alignments do not double-count a locus;
+- duplicate physical sequences collapse correctly;
+- one unique sequence across `k` loci sums to total weight 1;
+- strand mismatch triggers canonical QC failure.
 
-* correct File-A strand
-* opposite-strand File-B selection
-* correct 23/24 separation
-* passenger-length filtering
-* canonical sign interpretation
-* correct parsing of official stepRNA outputs
+### Stage 05 anchor logic
 
-## Transitivity
+- percentile is calculated over non-zero bins only;
+- exact 90th-percentile candidate rule;
+- deterministic tie-breaking;
+- 50-nt separation rule;
+- minimum three-anchor rule.
 
-* positive-sense coordinate orientation
-* upstream/downstream assignment
-* true sequence deduplication
-* zero-denominator → NA
-* paired movement of 24S/24AS in null
-* deterministic seed behaviour
+### Stage 05 window logic
 
-## General
+- anchor bin excluded;
+- downstream/upstream sign convention;
+- boundary truncation;
+- denominator equals number of valid anchor-bin observations;
+- overlapping anchor windows reproduce historical repeated-bin weighting.
 
-* missing required input → explicit failure
-* no silent fallback to legacy downstream results
+### Stage 05 endpoints
 
----
+- exact normalized `D` formula;
+- exact `D_24AS - D_24S` formula;
+- exact `F24_AS` formula;
+- zero denominator → `NA`;
+- positive synthetic downstream 24 composition gives positive `delta_F24_AS`.
 
-# 8. Explicitly superseded analyses
+### Stage 05 permutation and aggregation
 
-The following old outputs are historical references only:
-
-```text
-legacy fixed_length_23_24 summaries
-legacy custom Dicer-overhang summaries
-older viral transitivity implementations
-```
-
-They may be used for numerical comparison during validation.
-
-They must not silently become inputs to the new canonical results.
-
----
-
-# 9. Explicitly outside the current scope
-
-This build does not contain:
-
-* CHH analysis
-* Pero analysis
-* Ago2 host analysis
-* host transitivity
-* inferred host-trigger analysis
-* ViennaRNA accessibility
-* vdCHIBIN thermodynamic asymmetry
-* vdCHIBIN scoring
-* construct architecture comparison
-* Nectar Designer integration
-
-Those are separate future modules.
+- same shift applied to 24-AS and 24-S within a contig;
+- allowed-shift exclusion rule;
+- short-reference fallback is reported;
+- `(b+1)/(m+1)` P-value formula;
+- historical pair median;
+- historical virus median-of-medians;
+- canonical sample median-of-medians;
+- sample-cluster bootstrap keeps observations from a selected sample together;
+- historical three-window BH family;
+- canonical 12-test BH family;
+- fixed seed reproduces identical outputs.
 
 ---
 
-# 10. Definition of success
+## 8. Explicitly superseded analyses
+
+Older downstream results remain historical references only, including:
+
+- legacy fixed-length 23/24 summaries;
+- legacy custom Dicer-overhang summaries;
+- v1.4.0 transitivity implementation;
+- any v1.4.1 result loaded directly instead of recomputed from frozen inputs.
+
+They may be used for numerical regression checks, never as silent analytical inputs.
+
+---
+
+## 9. Explicitly outside current scope
+
+This build excludes:
+
+- CHH host analysis;
+- Pero host analysis;
+- Ago2 host analysis;
+- host transitivity;
+- inferred host-trigger analysis;
+- ViennaRNA vdCHIBIN accessibility scoring;
+- vdCHIBIN thermodynamic asymmetry scoring;
+- vdCHIBIN final ranking;
+- construct architecture comparison;
+- Nectar Designer integration.
+
+---
+
+## 10. Definition of success
 
 The first canonical viral pipeline is complete when:
 
-1. a fresh Git clone can point to the validated external legacy core;
-2. Stage 00 passes without changing the legacy directory;
-3. Stages 01–04 regenerate all 23/24, enrichment and Dicer outputs from frozen inputs;
-4. official stepRNA is the primary Dicer-overhang caller;
-5. the full stepRNA overhang distributions are retained rather than reducing the analysis to a single 2-nt number;
-6. sample clustering is respected in primary cross-dataset uncertainty estimates;
-7. the corrected strand-weighted background is used for combined enrichment;
-8. Dicer-conditioned sequence features are explicitly tested for information beyond general nucleotide enrichment;
-9. the exact final v1.4.1 anchor/multimapper/permutation definitions are recovered and locked before Stage 05 is implemented;
-10. Stage 05 reproduces the corrected analysis logic rather than an older transitivity version;
-11. all major calculations have deterministic tests;
-12. all metrics are defined in `METRIC_DICTIONARY.md`;
-13. one Snakemake entry point regenerates the complete downstream viral analysis;
-14. no manual copying of intermediate files is required;
-15. any difference from historical results is reported rather than hidden.
+1. a fresh clone can point to the frozen validated core;
+2. Stage 00 validates without modifying the core;
+3. Stages 01–04 regenerate 23/24, enrichment, and official stepRNA/Dicer outputs from frozen inputs;
+4. official stepRNA is the primary Dicer-overhang method;
+5. sample clustering is respected in canonical cross-dataset uncertainty estimates;
+6. historical Stage 05 reproduces the uploaded v1.4.1 results within numerical tolerance;
+7. canonical Stage 05 recomputes the same biological endpoints with sample-balanced inference;
+8. all major choices are configuration-controlled;
+9. all critical calculations have deterministic tests;
+10. all metrics are defined in `docs/METRIC_DICTIONARY.md`;
+11. one Snakemake entry point regenerates the entire downstream viral analysis;
+12. no manual movement or copying of intermediate outputs is required;
+13. any deviation from historical results is surfaced explicitly rather than hidden.
 
 ---
 
-# 11. Academic method basis
+## 11. Methodological references
 
-Primary methodological references include:
+The main methodological basis includes:
 
-* Murcott B. et al. (2022). *stepRNA: Identification of Dicer cleavage signatures and passenger strand lengths in small RNA sequences*. **Frontiers in Bioinformatics 2:994871.** DOI: 10.3389/fbinf.2022.994871.
-* Saravanan V., Berman G.J., Sober S.J. (2020). *Application of the hierarchical bootstrap to multi-level data in neuroscience*. Used here as general methodological support for respecting clustered/nested biological observations during resampling.
-* Benjamini Y. & Hochberg Y. (1995). *Controlling the false discovery rate: a practical and powerful approach to multiple testing.*
-* The corrected Varroa v1.2.1 core and v1.3 matched 23/24 analysis remain the project-specific source for eligibility, strict mappings, depth-masked backgrounds and strand-weighted nucleotide expectations.
+- Murcott B, Pawluk RJ, Protasio AV, Akinmusola RY, Lastik D, Hunt VL. 2022. *stepRNA: Identification of Dicer cleavage signatures and passenger strand lengths in small RNA sequences*. Frontiers in Bioinformatics 2:994871. DOI: 10.3389/fbinf.2022.994871.
+- Benjamini Y, Hochberg Y. 1995. *Controlling the False Discovery Rate: A Practical and Powerful Approach to Multiple Testing*. Journal of the Royal Statistical Society Series B 57:289–300.
+- Phipson B, Smyth GK. 2010. *Permutation P-values Should Never Be Zero: Calculating Exact P-values When Permutations Are Randomly Drawn*. Statistical Applications in Genetics and Molecular Biology 9:Article 39.
+- Saravanan V, Berman GJ, Sober SJ. 2020. *Application of the hierarchical bootstrap to multi-level data in neuroscience*. Used here as general methodological support for respecting nested/clustered observations; the biological application in this project is different.
+- Damayo J et al. 2026 preprint, *Primary and secondary antiviral RNAi responses throughout Varroa destructor life stages reveal the vertical transmission of viruses*. This is biological motivation for the historical 23→24 hypothesis. Mechanistic claims must remain limited to what the available data directly support.
 
 ---
 
-# 12. Canonical workflow summary
+## 12. Canonical workflow summary
 
 ```text
 READ-ONLY VALIDATED LEGACY CORE
@@ -1508,6 +1204,8 @@ READ-ONLY VALIDATED LEGACY CORE
               │
               ▼
 05_viral_transitivity_consistency
+      ├── historical_v1.4.1_replication
+      └── canonical_transitivity_analysis
 ```
 
 This is the complete scope of the first canonical downstream Varroa viral small-RNA pipeline.

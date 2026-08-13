@@ -1,104 +1,75 @@
 # Varroa vsiRNA Metric Dictionary
 
-**Version:** 0.2
+**Version:** 0.3  
 **Scope:** Canonical viral pipeline through viral spatial/transitivity-consistency analysis
 
 ---
 
-# 1. Purpose
+## 1. Purpose and metric classes
 
-This document defines the important quantities used by the canonical Varroa viral small-RNA pipeline.
+This document gives every important metric one fixed meaning.
 
-Every metric is classified as one of:
+Each metric is labelled as one of:
 
-* **Standard/descriptive** — conventional mathematical or statistical quantity.
-* **Published-method-derived** — produced by or directly based on a published method.
-* **Project-specific** — developed for this Varroa analysis for a defined biological question.
-* **Provisional** — conceptually defined, but exact implementation must be locked before canonical coding.
+- **Standard/descriptive** — conventional mathematical/statistical quantity.
+- **Published-method-derived** — output or definition taken directly from a published method such as stepRNA.
+- **Project-specific** — designed for this Varroa analysis to answer a defined biological question.
+- **Historical** — exact definition needed to reproduce v1.4.1.
+- **Canonical** — preferred definition/aggregation for the new pipeline.
 
-A project-specific metric is not automatically a weak metric. It simply means the exact statistic was designed for this biological question rather than copied from a published software package.
-
----
-
-# 2. Analysis units
-
-## `sample`
-
-One biological small-RNA sequencing library.
-
-This is the main biological clustering level for uncertainty estimation.
+A project-specific metric can be scientifically useful; the label simply prevents us from presenting it as a universally established RNAi statistic.
 
 ---
 
-## `sample_virus_unit`
+## 2. Analysis units
+
+### `sample`
+
+One sequencing library/sample identifier.
+
+For canonical cross-dataset inference, this is the top-level clustering unit because multiple viruses can be observed within the same library.
+
+### `sample_virus_unit`
 
 One virus analysed within one sample.
 
-Example:
+### `sample_virus_contig_unit`
 
-```text
-sample A × DWV-A
-sample A × DWV-B
-sample B × DWV-A
-```
+One viral reference contig analysed within one sample-virus unit.
 
-The first two units share the same biological library and therefore should not automatically be treated as fully independent replicates.
+The historical v1.4.1 output happened to contain one analysed contig per included sample-virus unit, but code must not assume that this is universal.
 
 ---
 
-# 3. Weighting modes
+## 3. Weighting modes
 
-## `abundance_weighted`
+### `abundance_weighted`
 
 **Class:** Standard/descriptive
 
-Repeated sequencing observations retain their abundance.
+A sequence contributes according to observed read abundance.
 
-Example:
-
-```text
-sequence A = 1000 reads
-sequence B =   10 reads
-```
-
-A contributes 100 times as much as B.
-
-### Question answered
+Question answered:
 
 > What dominates the accumulated sequenced small-RNA population?
 
----
+### `unique_sequence`
 
-## `unique_sequence`
+**Class:** Standard concept with project-specific analysis-unit definition
 
-**Class:** Standard/descriptive
+Each distinct RNA sequence contributes total weight 1 within the explicitly stated unit.
 
-Each distinct sequence contributes once within a precisely defined analysis unit.
+Question answered:
 
-Example:
+> Is the pattern represented across many distinct RNA sequence species rather than being driven by a few very abundant reads?
 
-```text
-sequence A = 1000 reads → 1 sequence
-sequence B =   10 reads → 1 sequence
-```
-
-### Question answered
-
-> Is the pattern represented across many distinct small-RNA sequences rather than being driven by a few abundant sequences?
-
-### Required implementation rule
-
-The deduplication unit must always be stated.
-
-For example:
+For Stage 05, identity is exactly:
 
 ```text
-sample × virus × length × strand
+virus × strand × length × sequence
 ```
 
-or, for spatial analysis, the exact corresponding spatial unit.
-
-The earlier viral-transitivity implementation contained a bug where a nominal unique-sequence analysis remained effectively read-weighted. The canonical implementation must perform true sequence-level deduplication.
+and total sequence weight 1 is divided across all exact compatible loci for that sequence.
 
 ---
 
@@ -108,80 +79,39 @@ The earlier viral-transitivity implementation contained a bug where a nominal un
 
 **Class:** Standard/descriptive
 
-Number of eligible 23-nt viral small RNAs under the specified weighting mode.
+Number or weighted abundance of eligible 23-nt viral small RNAs under the stated weighting mode.
 
-Always report the associated:
-
-* sample
-* virus
-* strand
-* weighting mode
-
----
+Always retain sample, virus, strand, and weighting mode.
 
 ## `count_24`
 
 Equivalent quantity for eligible 24-nt viral small RNAs.
 
----
-
 ## `antisense_fraction`
 
 **Class:** Standard/descriptive
 
-### Formula
-
 ```text
-antisense_fraction
-=
-antisense
-/
-(sense + antisense)
+antisense_fraction = antisense / (sense + antisense)
 ```
 
-### Range
+Interpretation:
 
 ```text
-0 to 1
+0.5  = equal sense and antisense contribution
+>0.5 = antisense-biased
+<0.5 = sense-biased
 ```
 
-### Interpretation
-
-```text
-0.5  → balanced
->0.5 → antisense-biased
-<0.5 → sense-biased
-```
-
-### Undefined case
-
-If:
-
-```text
-sense + antisense = 0
-```
-
-report:
-
-```text
-NA
-```
-
-Do not introduce a pseudocount merely to create a value.
-
----
+If the denominator is zero, report `NA`.
 
 ## `sense_fraction`
 
 ```text
-sense_fraction
-=
-sense
-/
-(sense + antisense)
+sense_fraction = sense / (sense + antisense)
 ```
 
-When both are defined:
+When defined:
 
 ```text
 sense_fraction + antisense_fraction = 1
@@ -191,7 +121,7 @@ sense_fraction + antisense_fraction = 1
 
 # 5. Terminal nucleotide coordinates
 
-Terminal positions are defined relative to the **physical sequenced RNA in its own 5′→3′ orientation**.
+Terminal positions are defined relative to the **physical sequenced RNA in its own 5′→3′ orientation**:
 
 ```text
 5′ N1 N2 ................ N(n-1) Nn 3′
@@ -199,232 +129,120 @@ Terminal positions are defined relative to the **physical sequenced RNA in its o
  5p1 5p2                  3p2   3p1
 ```
 
-Therefore an antisense RNA must be interpreted in its antisense RNA orientation rather than simply reading reference-genome coordinates.
+Antisense RNAs are therefore evaluated in antisense RNA orientation, not by simply reading the viral reference left-to-right.
 
 ---
 
 # 6. Terminal nucleotide enrichment
 
-## `observed_fraction`
+## `observed_fraction(b,p)`
 
 **Class:** Standard/descriptive
 
-For nucleotide (b) at terminal position (p):
+For nucleotide `b` at terminal position `p`:
 
 ```text
 observed_fraction(b,p)
-=
-number of observed eligible RNAs with b at p
-/
-number of eligible observed RNAs
+    = number/weight of eligible observed RNAs with b at p
+      / total number/weight of eligible observed RNAs
 ```
 
-Example:
-
-```text
-40 of 100 observed 23-mers contain U at 5p1
-
-observed_fraction(U,5p1) = 0.40
-```
-
----
-
-## `expected_fraction`
+## `expected_fraction(b,p)`
 
 **Class:** Project-specific matched-background quantity
 
-The expected frequency of that nucleotide among all **sequence-available, fully depth-supported windows of the same length** in the corresponding sample-specific viral consensus.
+Frequency of nucleotide `b` at position `p` among all fully depth-supported windows of the **same RNA length** in the corresponding sample-specific viral background.
 
-This corrects for viral sequence composition.
+- Sense expectation uses reference orientation.
+- Antisense expectation uses reverse-complement orientation.
+- Combined expectation uses the observed strand mixture rather than forcing a 50:50 mixture.
 
-The existing validated pipeline generates depth-masked consensuses specifically so poorly supported reference positions do not dominate this background.
-
-### Sense
-
-Use the viral reference orientation.
-
-### Antisense
-
-Use the reverse-complement orientation.
-
-### Combined strand
-
-The expected background is weighted according to the observed strand mixture:
+Conceptually:
 
 ```text
 expected_combined
-=
-wS × expected_sense
-+
-wAS × expected_antisense
+    = wS × expected_sense
+      + wAS × expected_antisense
 ```
 
-where:
-
-```text
-wS + wAS = 1
-```
-
-Do not automatically assume a 50:50 strand mixture.
-
----
+with `wS + wAS = 1`.
 
 ## `enrichment_ratio`
 
 **Class:** Project-specific empirical effect size
 
-### Formula
-
 ```text
-enrichment_ratio
-=
-observed_fraction
-/
-expected_fraction
+enrichment_ratio = observed_fraction / expected_fraction
 ```
 
-### Interpretation
+Interpretation:
 
 ```text
-1    → exactly as frequent as expected
->1   → enriched
-<1   → depleted
+1   = observed as often as sequence availability predicts
+>1  = enriched
+<1  = depleted
 ```
 
-Example:
+If `expected_fraction = 0`, report `NA`.
 
-```text
-observed 5p1-U = 0.40
-expected 5p1-U = 0.20
+This metric does not identify which molecular process created the enrichment.
 
-enrichment_ratio = 2.0
-```
+## `pair_median_enrichment_ratio`
 
-### Undefined case
+**Class:** Project-specific historical/cross-pair summary
 
-If:
+Median `enrichment_ratio` across eligible sample-virus units.
 
-```text
-expected_fraction = 0
-```
+This corresponds most closely to the historical design-facing `median_enrichment_ratio` used in the project.
 
-report:
+## `sample_balanced_median_enrichment_ratio`
 
-```text
-NA
-```
+**Class:** Project-specific canonical summary
 
-rather than infinity or an arbitrary pseudocount.
+1. median enrichment across eligible viruses within each sample;
+2. median across sample-level medians.
 
-### Biological interpretation
+Use a sample-clustered bootstrap for its confidence interval.
 
-This is an empirical preference among sequenced Varroa viral small RNAs.
-
-It does not independently identify whether enrichment arose from:
-
-* Dicer processing
-* Argonaute loading
-* strand selection
-* RNA degradation/stability
-* sequencing/library effects
-* another biological process
-
----
-
-## `median_enrichment_ratio`
-
-**Class:** Project-specific cross-dataset summary
-
-Median `enrichment_ratio` across eligible biological units.
-
-This remains the main empirical nucleotide statistic intended for later design work.
-
-### Why median?
-
-The median is less sensitive than a mean to one extreme sample-virus infection.
-
-### Required accompanying information
-
-Always retain:
-
-```text
-median
-95% sample-aware bootstrap CI
-number of contributing samples
-number of contributing sample-virus units
-```
-
----
-
-# 7. 23-vs-24 similarity
+Both pair- and sample-balanced fields should be exported so historical design references are not silently redefined.
 
 ## `spearman_rho_23_24`
 
 **Class:** Standard statistical metric
 
-Spearman rank correlation between matched 23- and 24-nt enrichment landscapes.
-
-### Range
+Spearman rank correlation between matched 23- and 24-nt terminal enrichment landscapes.
 
 ```text
-+1 → identical rank order
- 0 → no monotonic association
--1 → opposite rank order
++1 = identical rank order
+ 0 = no monotonic association
+-1 = opposite rank order
 ```
 
-### Purpose
-
-Tests whether nucleotide features enriched among 23-mers tend also to be enriched among 24-mers.
-
-This is an association statistic, not evidence that the same enzyme generated both populations.
+This measures similarity of enrichment patterns, not shared enzymatic origin.
 
 ---
 
-# 8. stepRNA geometry quantities
+# 7. stepRNA geometry metrics
 
-stepRNA is the published primary method for Dicer-overhang analysis.
-
-It directly aligns candidate reference small RNAs against potential passenger RNAs and determines 5′ and 3′ overhang/underhang geometry and passenger length. It uses exact matching by default.
-
----
+The following quantities follow official stepRNA conventions.
 
 ## `steprna_5p_distance`
 
 **Class:** Published-method-derived
 
-Signed 5′ duplex-end distance reported according to the official stepRNA convention.
-
-stepRNA defines:
+Signed 5′ distance relative to the File-A reference RNA:
 
 ```text
-negative = overhang
-positive = underhang
+negative = reference overhang
+positive = reference underhang
 0        = blunt
 ```
-
-relative to the File-A reference strand.
-
-Downstream code must preserve this sign convention exactly.
-
----
 
 ## `steprna_3p_distance`
 
 **Class:** Published-method-derived
 
-Equivalent signed distance at the 3′ end.
-
-Again:
-
-```text
-negative = overhang
-positive = underhang
-0        = blunt
-```
-
-according to stepRNA's reference-strand convention.
-
----
+Equivalent signed distance at the 3′ end using the same sign convention.
 
 ## `passenger_length`
 
@@ -432,594 +250,302 @@ according to stepRNA's reference-strand convention.
 
 Length of the complementary passenger sequence identified by stepRNA.
 
-stepRNA explicitly reports passenger-length distributions as one of its primary outputs.
-
----
-
-# 9. Passenger recovery
-
-This should be kept separate from Dicer geometry.
-
 ## `passenger_recovery_fraction`
 
-**Class:** Published-method-derived descriptive quantity
-
-### Formula
+**Class:** Descriptive quantity based on stepRNA output
 
 ```text
-number of File-A reference RNAs
-with ≥1 predicted passenger
-/
-total number of eligible File-A reference RNAs
+passenger_recovery_fraction
+    = File-A references with at least one recovered passenger
+      / all eligible File-A references
 ```
 
-### Interpretation
+Low passenger recovery does not by itself mean Dicer processing is absent.
 
-Higher values mean complementary passenger sequences can be reconstructed for a greater proportion of the population.
+## `steprna_log_ratio` / installed stepRNA enrichment field
 
-### Important limitation
+**Class:** Published-method-derived
 
-Low passenger recovery does not imply absence of Dicer processing.
+Use the enrichment/log-ratio field produced by the installed official stepRNA version. Do not silently reimplement it with a different formula or rename it as a generic odds ratio unless the software output explicitly uses that definition.
 
-Passenger strands can be:
+The published method describes a log ratio comparing a distance-specific count with the mean end-distance count.
 
-* degraded
-* depleted during RISC maturation
-* poorly represented in sequencing
-* rare because of strong strand bias
+## `steprna_wald_z`
 
-stepRNA itself demonstrates that a Dicer signature can still be detected when only a small fraction of non-collapsed reference RNAs have recoverable passengers.
+**Class:** Published-method-derived
+
+Official stepRNA Wald Z-score for enrichment of an overhang/underhang distance.
+
+Use the value produced by stepRNA rather than creating a different statistic under the same name.
 
 ---
 
-# 10. Varroa pre-specified 2-nt geometry
+# 8. Pre-specified Varroa joint Dicer-like geometry
 
-The term **“canonical Dicer support” should no longer be used without qualification.**
-
-Dicer frequently produces approximately 2-nt 3′ overhangs, but Dicer cleavage geometry can vary with substrate and biological pathway. Experimental and stepRNA analyses show enriched 0-, 1-, 2- or 3-nt geometries in different contexts.
-
-Therefore use:
+The term “canonical Dicer geometry” is avoided as a universal label because Dicer-associated end geometry varies by pathway and organism.
 
 ## `varroa_2nt_joint_geometry`
 
 **Class:** Project-specific, pre-specified pathway feature
 
-Historical Varroa representation:
-
-```text
-5p_underhang_2__3p_overhang_2
-```
-
-Under official stepRNA sign convention this corresponds conceptually to:
+Historical Varroa geometry of interest:
 
 ```text
 5′ distance = +2
 3′ distance = -2
 ```
 
-relative to the selected File-A reference strand.
+under official stepRNA sign convention.
 
-This is a **pre-specified Varroa geometry of interest**, not a universal definition of Dicer cleavage.
+Equivalent historical label:
 
----
+```text
+5p_underhang_2__3p_overhang_2
+```
+
+This is a pre-specified Varroa feature of interest, not a universal definition of Dicer cleavage.
 
 ## `varroa_2nt_fraction_all_refs`
 
-### Formula
-
 ```text
-number of File-A references supporting
-the pre-specified joint geometry
-/
-all eligible File-A references
+number of all eligible File-A references supporting the joint geometry
+/ all eligible File-A references
 ```
 
-### Purpose
-
-Measures recoverable population-level support.
-
-### Limitation
-
-Strongly affected by passenger availability.
-
-It should therefore never be interpreted alone.
-
----
+This combines passenger recoverability and geometry and must not be interpreted alone.
 
 ## `varroa_2nt_fraction_recovered`
 
-### Formula
-
 ```text
-number of passenger-recovered reference RNAs
-supporting the pre-specified joint geometry
-/
-number of reference RNAs with ≥1 recovered passenger
+number of passenger-recovered references supporting the joint geometry
+/ number of File-A references with at least one recovered passenger
 ```
 
-### Purpose
-
-Asks:
-
-> Among references for which a complementary partner was actually recoverable, how common is the Varroa 2-nt geometry?
-
-This separates geometry from the overall passenger-recovery problem.
-
-Both `varroa_2nt_fraction_all_refs` and `varroa_2nt_fraction_recovered` should be reported.
+This asks how common the geometry is **conditional on a passenger actually being recoverable**.
 
 ---
 
-# 11. Official stepRNA enrichment metrics
+# 9. `delta_dicer`
 
-## `steprna_log_odds`
-
-**Class:** Published-method-derived
-
-Use the value generated by official stepRNA.
-
-stepRNA calculates a log ratio comparing the count at a particular end-distance with the mean count across end distances.
-
-Do not silently recreate this statistic with a different formula.
-
----
-
-## `steprna_wald_z`
-
-**Class:** Published-method-derived
-
-Official stepRNA significance statistic for overhang-distance enrichment.
-
-stepRNA calculates Z-scores using a Wald-test framework.
-
-### Interpretation
-
-Larger positive Z:
-
-> stronger enrichment of the tested geometry relative to stepRNA's internal background model.
-
-### Use
-
-This is the **primary published statistical evidence** for enriched Dicer-like duplex geometry.
-
----
-
-# 12. `delta_dicer`
-
-Written:
-
-```text
-Δ_Dicer
-```
+Written `Δ_Dicer`.
 
 **Class:** Project-specific secondary statistic
 
-This is **not an official stepRNA statistic**.
-
-### Definition
-
-For a pre-specified target end-distance (d^*) and a pre-specified comparison set (D_0):
+For pre-specified target distance `d*` and pre-specified comparison set `D0`:
 
 ```text
 Δ_Dicer
-=
-support(d*)
--
-mean[support(d) for d in D0]
+    = support(d*)
+      - mean[support(d) for d in D0]
 ```
 
-### Critical requirement
+`D0` must be defined before examining the result.
 
-The comparison-distance set `D0` must be fixed in configuration **before analysing the results**.
-
-It cannot be chosen after inspecting which alternative distances are low.
-
-### Interpretation
+Interpretation:
 
 ```text
-≈0 → target geometry does not stand out
->0 → target geometry exceeds comparison distances
+≈0 = target geometry does not stand out
+>0 = target geometry exceeds the comparison distances
 ```
 
-### Role
-
-Secondary validation of our historical Varroa result.
-
-Official stepRNA inference remains primary.
+This is not an official stepRNA statistic and is not directly a candidate-window score.
 
 ---
 
-# 13. Dicer-conditioned sequence features
+# 10. Dicer-conditioned sequence metrics
 
-This analysis asks whether the subset with strong Dicer-like geometry has nucleotide properties beyond those already present in all observed siRNAs.
-
----
-
-## `E_Dicer_absolute`
+## `E_Dicer_absolute(f)`
 
 **Class:** Project-specific exploratory/candidate-development metric
-
-For feature (f):
 
 ```text
 E_Dicer_absolute(f)
-=
-frequency of f among the pre-specified
-Dicer-supported subset
-/
-expected frequency of f from the matched
-viral-sequence background
+    = frequency of feature f among the pre-specified Dicer-supported subset
+      / matched viral-sequence expected frequency of f
 ```
 
-### Interpretation
+The background must be matched by sample, virus, length, and strand.
 
-```text
-1    → as frequent as sequence availability predicts
->1   → enriched
-<1   → depleted
-```
+## `E_all_observed(f)`
 
-The background must be matched by:
+General matched enrichment for feature `f` from Stage 02.
 
-* sample
-* virus
-* length
-* strand
-
-in the same manner as Stage 02.
-
----
-
-## `E_all_observed`
-
-General matched enrichment for the same feature from Stage 02.
-
----
-
-## `dicer_specific_log2_contrast`
+## `dicer_specific_log2_contrast(f)`
 
 **Class:** Project-specific exploratory/candidate-development metric
 
-Preferred over the previous raw ratio-of-ratios because it is symmetric around zero.
-
-### Formula
-
 ```text
-dicer_specific_log2_contrast
-=
-log2(
-    E_Dicer_absolute
-    /
-    E_all_observed
-)
+dicer_specific_log2_contrast(f)
+    = log2(E_Dicer_absolute(f) / E_all_observed(f))
 ```
 
-### Interpretation
+Interpretation:
 
 ```text
-0  → Dicer subset adds no enrichment beyond the general population
-
->0 → feature is more enriched among Dicer-supported RNAs
-
-<0 → feature is less enriched among Dicer-supported RNAs
+0  = Dicer-supported subset adds little beyond general enrichment
+>0 = feature is more enriched in Dicer-supported RNAs
+<0 = feature is less enriched in Dicer-supported RNAs
 ```
 
-### Undefined cases
-
-If either required enrichment is mathematically undefined or zero in a way that makes the logarithm undefined:
-
-```text
-report NA
-```
-
-Do not introduce an arbitrary pseudocount merely to create a finite value.
-
-A formal count-based model may later be preferable if sparse cells become important.
-
----
+If the required ratio is undefined or non-positive, report `NA`; do not add an arbitrary pseudocount solely to force a finite logarithm.
 
 ## `dicer_general_correlation`
 
-**Class:** Standard statistical comparison applied to project metrics
+**Class:** Standard correlation applied to project metrics
 
-Spearman correlation between:
+Correlation between general terminal enrichment and Dicer-conditioned enrichment.
 
-```text
-general terminal enrichment
-```
-
-and:
-
-```text
-Dicer-conditioned terminal enrichment
-```
-
-### Purpose
-
-Determine whether the proposed Dicer-derived metric provides information independent of the existing nucleotide-enrichment score.
-
-A high correlation would argue against automatically treating both as independent ranking dimensions.
+Purpose: detect redundancy before any Dicer-derived feature is considered for later sequence ranking.
 
 ---
 
-# 14. Dicer metric interpretation
+# 11. Stage-05 coordinate and track metrics
 
-Dicer metrics fall into two fundamentally different groups:
+## `alignment_midpoint_nt`
 
-### Pathway-level
-
-```text
-stepRNA distance distribution
-steprna_wald_z
-passenger_recovery_fraction
-varroa_2nt_fraction_all_refs
-varroa_2nt_fraction_recovered
-Δ_Dicer
-```
-
-These describe **how a population appears to have been processed**.
-
-They are not intrinsic scores for an untested candidate sequence.
-
-### Candidate-feature-development
+**Class:** Historical/project-specific coordinate convention
 
 ```text
-E_Dicer_absolute
-dicer_specific_log2_contrast
+alignment_midpoint_nt
+    = alignment_start_0based + (read_length - 1) / 2
 ```
 
-These may eventually become candidate-level features **only if they are reproducible and non-redundant**.
+This is the coordinate used by v1.4.1 to place a 23/24-nt read on the viral genome.
+
+## `bin_index`
+
+With historical/default `bin_size_nt = 10`:
+
+```text
+bin_index = floor(alignment_midpoint_nt / 10)
+```
+
+## `abundance_locus_weight`
+
+**Class:** Project-specific multimapper handling
+
+For one QNAME with read abundance `a` and `k` unique exact compatible loci:
+
+```text
+abundance_locus_weight = a / k
+```
+
+Total weight over its loci is `a`.
+
+## `unique_sequence_locus_weight`
+
+**Class:** Project-specific corrected v1.4.1 definition
+
+For one distinct sequence identity:
+
+```text
+virus × strand × length × sequence
+```
+
+with `k` unique exact compatible loci:
+
+```text
+unique_sequence_locus_weight = 1 / k
+```
+
+Total weight over all compatible loci is exactly 1.
 
 ---
 
-# 15. Viral spatial/transitivity metrics
+# 12. 23-nt anchor metrics
 
-Secondary-siRNA/transitivity literature supports examining small RNAs arising beyond or along the target transcript after primary silencing and demonstrates that secondary-siRNA production can spread directionally from an initiating event.
+## `balanced23_anchor_score`
 
-However, the exact metrics below are **Varroa project-specific**, not standard published transitivity statistics.
+Previously `balanced23`.
 
-Our previous v1.4.1 analysis used `balanced23`, `combined23`, `D_24AS − D_24S`, `F24_AS`, true sequence deduplication, paired movement of 24S/24AS during permutation, and BH correction.
+**Class:** Project-specific
 
-The exact spatial hotspot implementation still needs to be recovered before Stage 05 is frozen.
+Per 10-nt bin:
+
+```text
+balanced23_anchor_score = sqrt(23S × 23AS)
+```
+
+This is the geometric mean of the local sense and antisense 23-nt signals.
+
+High values require both strands to be represented.
+
+It is a **primary-like anchor score**, not proof that the locus is biologically primary.
+
+## `combined23_anchor_score`
+
+Previously `combined23`.
+
+**Class:** Project-specific
+
+```text
+combined23_anchor_score = 23S + 23AS
+```
+
+Measures total local 23-nt signal without requiring strand balance.
 
 ---
 
-# 16. `balanced23_anchor_score`
+# 13. Historical anchor-selection parameters
 
-Previously called:
-
-```text
-balanced23
-```
-
-**Class:** Project-specific, provisional until Stage-05 implementation lock
-
-### Formula
+These are parameters, not biological metrics.
 
 ```text
-balanced23_anchor_score
-=
-sqrt(23_sense × 23_antisense)
+anchor_percentile        = 90th percentile
+percentile_population    = non-zero anchor-score bins only
+anchor_min_separation_nt = 50 nt
+minimum_anchors          = 3
+bin_size_nt              = 10 nt
 ```
 
-This is the geometric mean of the two strand-specific local signals.
-
-### Interpretation
-
-High values require substantial signal from **both strands**.
-
-Example:
+## `anchor_threshold`
 
 ```text
-23S  = 100
-23AS = 100
-
-balanced23 = 100
+anchor_threshold
+    = percentile_90(anchor scores among bins with score > 0)
 ```
 
-If one strand approaches zero, the score approaches zero.
+A candidate bin must satisfy:
 
-### Biological purpose
+```text
+score >= anchor_threshold
+```
 
-Identify regions more compatible with bidirectional processing of dsRNA than a purely one-sided hotspot.
+Candidates are processed from strongest to weakest and greedily retained if at least 50 nt from already selected anchors.
 
-### Important note
-
-This is **not a published standard RNAi metric**.
-
-It is a biologically motivated anchor score created for this analysis.
-
-The exact underlying track unit—raw abundance, normalized abundance or unique-sequence signal—must be specified separately.
+Canonical implementation uses genomic coordinate as the deterministic tie-breaker for equal scores.
 
 ---
 
-# 17. `combined23_anchor_score`
+# 14. Anchor-window mean density
 
-Previously:
+This is essential for interpreting all Stage-05 spatial metrics.
 
-```text
-combined23
-```
+For each anchor and window `W`, the anchor bin itself is excluded. Available bins are collected separately upstream and downstream; reference boundaries truncate the window.
 
-**Class:** Project-specific, provisional
+## `M_X_down(W)`
 
-### Formula
+For track `X`:
 
 ```text
-combined23_anchor_score
-=
-23_sense + 23_antisense
+M_X_down(W)
+    = sum of X over all valid anchor-specific downstream bin observations
+      / number of valid anchor-specific downstream bin observations
 ```
 
-### Purpose
-
-Measures total local 23-nt activity without requiring strand balance.
-
-Used as a looser alternative to `balanced23_anchor_score`.
-
----
-
-# 18. `F24_AS`
-
-**Class:** Standard proportion used in a project-specific biological comparison
-
-### Formula
+## `M_X_up(W)`
 
 ```text
-F24_AS
-=
-24AS
-/
-(23AS + 24AS)
+M_X_up(W)
+    = sum of X over all valid anchor-specific upstream bin observations
+      / number of valid anchor-specific upstream bin observations
 ```
 
-### Meaning
+If two anchor windows overlap, the same genomic bin can appear once for each anchor neighbourhood containing it.
 
-Among antisense 23+24-nt small RNAs in the region, what proportion are 24 nt?
+Therefore these are **anchor-window pooled mean densities**, not means over unique genomic territory.
 
-### Range
-
-```text
-0 → entirely 23 nt
-1 → entirely 24 nt
-```
-
-### Zero-signal rule
-
-If:
-
-```text
-23AS + 24AS = 0
-```
-
-then:
-
-```text
-F24_AS = NA
-```
-
-There is no composition to estimate.
-
-No pseudocount should manufacture a value.
-
----
-
-# 19. `delta_F24_AS`
-
-Written:
-
-```text
-ΔF24_AS
-```
-
-**Class:** Project-specific spatial contrast
-
-### Formula
-
-```text
-ΔF24_AS
-=
-F24_AS_downstream
--
-F24_AS_upstream
-```
-
-### Interpretation
-
-```text
->0
-downstream antisense population is relatively more 24-nt dominated
-
-≈0
-little change in 23/24 composition
-
-<0
-downstream population is relatively more 23-nt dominated
-```
-
-### Important distinction
-
-A positive value does **not** necessarily mean more total small RNA is produced downstream.
-
-It describes **composition**.
-
----
-
-# 20. `D_24AS`
-
-**Class:** Project-specific, provisional until Stage-05 implementation lock
-
-Conceptually:
-
-```text
-D_24AS
-=
-24AS_downstream
--
-24AS_upstream
-```
-
-However, the exact definition of the underlying downstream/upstream signal—particularly:
-
-* normalization
-* boundary handling
-* hotspot aggregation
-* positional multimapping
-
-must be recovered from the final v1.4.1 implementation before this metric is considered fully canonical.
-
-Do not code from this conceptual definition alone.
-
----
-
-# 21. `D_24S`
-
-Equivalent directional contrast for 24-nt sense RNA.
-
-Also **provisional** until the exact Stage-05 spatial implementation is recovered.
-
----
-
-# 22. `antisense_specific_directionality`
-
-Historical notation:
-
-```text
-D_24AS − D_24S
-```
-
-**Class:** Project-specific difference-of-directionality contrast
-
-### Conceptual formula
-
-```text
-antisense_specific_directionality
-=
-D_24AS
--
-D_24S
-```
-
-### Purpose
-
-Control for general downstream-versus-upstream effects that influence both 24-nt strands.
-
-Question answered:
-
-> Is downstream behaviour stronger specifically for the 24-nt antisense population than for the corresponding 24-nt sense population?
-
-### Interpretation
-
-```text
->0 → more antisense-specific downstream directionality
-≈0 → no strong antisense-specific effect
-<0 → opposite directional tendency
-```
-
-This remains provisional until `D_24AS` and `D_24S` are implementation-locked.
-
----
-
-# 23. Canonical spatial distances
+Canonical windows are:
 
 ```text
 100 nt
@@ -1027,152 +553,449 @@ This remains provisional until `D_24AS` and `D_24S` are implementation-locked.
 500 nt
 ```
 
-**Class:** Project analysis parameters
-
-These are predefined comparison distances.
-
-They are **not metrics** and must not be interpreted as established biological propagation distances.
+With 10-nt bins these correspond to 10, 25, and 50 bins on each side.
 
 ---
 
-# 24. Permutation P-value
+# 15. Normalized 24-nt directionality
 
-## `p_permutation`
+## `D_24AS`
 
-**Class:** Standard resampling inference
-
-For (m) randomly generated null permutations and (b) null statistics at least as extreme as the observed statistic under the pre-specified tail:
+**Class:** Project-specific historical/canonical endpoint component
 
 ```text
-p_permutation
-=
-(b + 1)
-/
-(m + 1)
+D_24AS
+    = (M_24AS_down - M_24AS_up)
+      / (M_24AS_down + M_24AS_up)
 ```
 
-The +1 correction prevents reporting an impossible zero P-value when only a finite number of random permutations were sampled, following recommended practice for Monte-Carlo permutation tests.
+If the denominator is zero or either mean is not finite, report `NA`.
 
-### Requirement
-
-Before analysis, specify whether the test is:
-
-* upper-tailed
-* lower-tailed
-* two-sided
-
-according to the biological hypothesis.
-
-Do not choose the tail after seeing the result.
-
----
-
-# 25. Benjamini-Hochberg adjusted value
-
-## `p_BH`
-
-or preferably:
+Range when defined with non-negative tracks:
 
 ```text
-q_BH
+-1 to +1
 ```
 
-**Class:** Standard multiple-testing procedure
+Interpretation:
 
-Benjamini-Hochberg controls the false-discovery rate across a defined family of hypothesis tests.
+```text
++1  = signal only downstream
+ 0  = equal upstream/downstream mean density
+-1  = signal only upstream
+```
 
-### Requirement
+## `D_24S`
 
-The test family must be defined before examining significance.
+```text
+D_24S
+    = (M_24S_down - M_24S_up)
+      / (M_24S_down + M_24S_up)
+```
 
-Examples might involve the predefined combination of:
+Same interpretation for the sense 24-nt control track.
 
-* endpoint
-* distance
-* anchor definition
-* weighting mode
+## `antisense_specific_directionality`
 
-The exact Stage-05 family from v1.4.1 still needs to be recovered.
+Historical field:
+
+```text
+D24_antisense_minus_sense
+```
+
+**Class:** Project-specific primary/secondary endpoint
+
+```text
+antisense_specific_directionality
+    = D_24AS - D_24S
+```
+
+Possible range is approximately `-2` to `+2`.
+
+Interpretation:
+
+```text
+>0 = 24-AS is more downstream-biased than 24-S
+≈0 = little antisense-specific directional difference
+<0 = 24-AS is less downstream-biased than 24-S
+```
+
+The subtraction is intended to control for generic positional asymmetry that affects both 24-nt strands.
 
 ---
 
-# 26. Sample-clustered bootstrap
+# 16. Antisense 23→24 composition
+
+## `F24_AS_down`
+
+**Class:** Standard proportion used in a project-specific spatial comparison
+
+```text
+F24_AS_down
+    = M_24AS_down
+      / (M_23AS_down + M_24AS_down)
+```
+
+## `F24_AS_up`
+
+```text
+F24_AS_up
+    = M_24AS_up
+      / (M_23AS_up + M_24AS_up)
+```
+
+If either denominator is zero, the corresponding fraction is `NA`.
+
+Range:
+
+```text
+0 = antisense 23+24 signal is entirely 23 nt
+1 = antisense 23+24 signal is entirely 24 nt
+```
+
+## `delta_F24_AS`
+
+Historical field:
+
+```text
+downstream_minus_upstream_24_fraction_AS
+```
+
+**Class:** Project-specific spatial composition endpoint
+
+```text
+delta_F24_AS = F24_AS_down - F24_AS_up
+```
+
+Interpretation:
+
+```text
+>0 = downstream antisense signal is relatively more 24-nt dominated
+≈0 = little upstream/downstream compositional change
+<0 = downstream antisense signal is relatively more 23-nt dominated
+```
+
+A positive value does **not** necessarily mean there are more total small RNAs downstream. It means the antisense 23:24 composition shifted toward 24 nt.
+
+For intuition, `+0.003` corresponds to a +0.3 percentage-point change in the 24-nt fraction.
+
+---
+
+# 17. Cross-correlation metrics
+
+These are descriptive support, not the primary transitivity endpoints.
+
+## `crosscorr_23_to_24(lag)`
+
+**Class:** Standard correlation applied to project tracks
+
+Historical v1.4.1 calculates Pearson correlation between:
+
+```text
+log1p(23-nt anchor-score track)
+```
+
+and:
+
+```text
+log1p(24-nt target-strand track)
+```
+
+at lags from `-500` to `+500 nt` in 10-nt steps.
+
+Historical convention:
+
+```text
+positive lag = target 24-nt signal displaced downstream of the 23-nt anchor signal
+```
+
+A lag is `NA` when fewer than 10 overlapping bins remain or either vector has zero variance.
+
+## `lag_asymmetry_strand`
+
+```text
+lag_asymmetry_strand
+    = mean(correlation at positive lags)
+      - mean(correlation at negative lags)
+```
+
+## `lag_asymmetry_AS_minus_S`
+
+```text
+lag_asymmetry_AS_minus_S
+    = lag_asymmetry_antisense - lag_asymmetry_sense
+```
+
+These statistics describe directional correlation structure; they are not treated as proof of transitivity.
+
+---
+
+# 18. Historical circular-shift null
+
+## `allowed_circular_shift`
+
+**Class:** Historical project-specific null definition
+
+For a track with `n` bins and exclusion distance `e` bins:
+
+```text
+shift ∈ {1, 2, ..., n-1}
+```
+
+is preferred when:
+
+```text
+min(shift, n - shift) > e
+```
+
+Under default parameters:
+
+```text
+e = max_window_nt / bin_size_nt = 500 / 10 = 50 bins
+```
+
+If no preferred shifts exist, historical v1.4.1 falls back to all non-zero circular shifts.
+
+Within one contig and permutation replicate, **the same shift is applied to 24-AS and 24-S**.
+
+The 23-nt tracks and anchors remain fixed.
+
+---
+
+# 19. Empirical permutation P-value
+
+## `p_shift`
+
+**Class:** Standard Monte-Carlo permutation-P construction applied to the project null
+
+For the pre-specified upper-tail alternative:
+
+```text
+p_shift
+    = (b + 1) / (m + 1)
+```
+
+where:
+
+```text
+b = number of valid null statistics >= observed statistic
+m = number of valid null statistics
+```
+
+The +1 correction prevents a finite random-permutation analysis from reporting `p = 0`.
+
+The test direction must be fixed before viewing results.
+
+---
+
+# 20. Historical aggregation metrics
+
+## `pair_balanced_median`
+
+**Class:** Historical/project-specific summary
+
+For a fixed weighting × anchor × window × endpoint:
+
+```text
+pair_balanced_median
+    = median of finite sample-virus-contig endpoint values
+```
+
+This gives each row equal influence regardless of read depth.
+
+It does **not** account for several virus rows originating from one sample.
+
+## `virus_balanced_median`
+
+**Class:** Historical/project-specific sensitivity summary
+
+```text
+virus_balanced_median
+    = median across viruses of
+      [median endpoint within each virus]
+```
+
+Purpose: reduce domination by viruses represented in many sample-virus units.
+
+---
+
+# 21. Canonical sample-balanced aggregation
+
+## `sample_balanced_median`
+
+**Class:** Canonical project summary
+
+For a fixed weighting × anchor × window × endpoint:
+
+```text
+sample_stat(sample)
+    = median of finite endpoint values across that sample's eligible virus-contigs
+
+sample_balanced_median
+    = median of sample_stat(sample) across samples
+```
+
+Purpose: prevent a sample containing several eligible viruses from behaving like several independent top-level samples.
 
 ## `sample_clustered_CI95`
 
-**Class:** Standard hierarchical-resampling approach adapted to this dataset
+**Class:** Canonical cluster-bootstrap uncertainty interval
 
-### Procedure
-
-The biological sample is the top-level resampling cluster.
-
-When a sample is selected during bootstrap resampling, its relevant sample-virus observations are retained together.
-
-### Why?
-
-Multiple observations originating from the same sequencing library are correlated rather than independent.
-
-Hierarchical/clustered bootstrap methods are specifically designed for nested data where lower-level observations share higher-level biological units.
-
-### Output
+Bootstrap sample IDs with replacement. All eligible observations belonging to a sampled sample are kept together, the within-sample median is recomputed, and then the across-sample median is recomputed.
 
 Report:
 
 ```text
 point estimate
-2.5th bootstrap percentile
-97.5th bootstrap percentile
+2.5th percentile
+97.5th percentile
 number of bootstrap replicates
-random seed
+seed
 ```
 
-The exact CI method must be recorded.
+---
+
+# 22. Permutation aggregation
+
+## `pair_global_shift_null`
+
+Historical v1.4.1 takes, at each permutation index, the median of finite per-contig null statistics.
+
+## `virus_balanced_global_shift_null`
+
+At each permutation index:
+
+1. median null statistic within each virus;
+2. median across virus medians.
+
+## `sample_balanced_global_shift_null`
+
+**Class:** Canonical null aggregation
+
+At each permutation index:
+
+1. calculate each contig's shifted endpoint;
+2. median across eligible virus-contigs within each sample;
+3. median across sample medians.
+
+Canonical `p_shift` compares the observed `sample_balanced_median` with this sample-balanced null distribution.
 
 ---
 
-# 27. Pair-balanced summary
+# 23. Benjamini-Hochberg adjusted values
 
-**Class:** Project-specific descriptive/sensitivity aggregation
+## `q_BH_historical`
 
-Each eligible sample-virus unit contributes comparably instead of weighting units by sequencing depth.
+**Class:** Historical multiple-testing summary
 
-Useful for determining whether extremely deep infections dominate the result.
+Historical v1.4.1 applies BH across the three windows:
 
-This is a sensitivity/descriptive analysis, not a substitute for respecting sample-level clustering.
+```text
+100, 250, 500 nt
+```
+
+separately for each:
+
+```text
+weighting × anchor definition × endpoint × aggregation
+```
+
+Each historical family therefore contains three P-values.
+
+## `q_BH_canonical`
+
+**Class:** Canonical multiple-testing summary
+
+For the primary sample-balanced analysis, one family is defined for each biological endpoint across:
+
+```text
+2 weighting modes × 2 anchor definitions × 3 windows = 12 tests
+```
+
+Separate 12-test families are used for:
+
+```text
+delta_F24_AS
+antisense_specific_directionality
+```
+
+Robustness/descriptive analyses are not silently used as additional routes to a primary significance claim.
 
 ---
 
-# 28. Virus-balanced summary
+# 24. Leave-one-virus-out analysis
 
-**Class:** Project-specific sensitivity aggregation
+## `leave_one_virus_out_effect`
 
-Each biological virus contributes comparably to the higher-level summary.
+**Class:** Sensitivity analysis
 
-### Purpose
+Repeatedly calculate the higher-level effect after excluding one virus.
 
-Determine whether the overall conclusion is dominated by viruses represented in many samples or with unusually strong signal.
+Purpose:
 
----
+> Determine whether the conclusion is heavily dependent on one virus.
 
-# 29. Leave-one-virus-out analysis
-
-**Class:** Standard sensitivity-analysis principle applied to this project
-
-Repeatedly calculate the result after excluding one biological virus.
-
-### Interpretation
-
-Stable result:
-
-> stronger evidence that the conclusion is not driven by one virus.
-
-Strongly changing result:
-
-> conclusion depends substantially on particular virus biology.
+A stable sign/magnitude across exclusions supports broader robustness; strong changes indicate virus dependence.
 
 ---
 
-# 30. Metric classes
+# 25. Interpretation hierarchy for Stage 05
+
+The two main biological endpoints answer different questions.
+
+## `antisense_specific_directionality`
+
+Asks:
+
+> Is 24-AS more downstream-biased than the 24-S control?
+
+This is about **absolute spatial directionality after strand control**.
+
+## `delta_F24_AS`
+
+Asks:
+
+> Does the downstream antisense 23+24 population contain a larger fraction of 24-mers than the upstream population?
+
+This is about **length composition**, not total abundance.
+
+A dataset can show a positive composition shift while showing little or no antisense-specific absolute directionality. That pattern is exactly why both metrics must be kept separate.
+
+---
+
+# 26. Historical v1.4.1 regression values
+
+These values are not metric definitions and must never be used as analytical inputs. They are stored only to verify exact historical replication.
+
+For `unique_sequence × balanced23`, archived pair-balanced `delta_F24_AS` values are approximately:
+
+```text
+100 nt  -0.000113
+250 nt  +0.002682
+500 nt  +0.003662
+```
+
+Equivalent percentage-point shifts are approximately:
+
+```text
+100 nt  -0.0113 percentage points
+250 nt  +0.2682 percentage points
+500 nt  +0.3662 percentage points
+```
+
+Archived pair-level BH values for this endpoint are approximately:
+
+```text
+100 nt  0.471706
+250 nt  0.018596
+500 nt  0.000600
+```
+
+The archived `antisense_specific_directionality` endpoint did not show convincing evidence of an absolute downstream 24-AS wave.
+
+---
+
+# 27. Metric classes by biological role
 
 ## Descriptive population metrics
 
@@ -1183,19 +1006,16 @@ sense_fraction
 antisense_fraction
 ```
 
----
-
 ## Empirical sequence metrics
 
 ```text
 observed_fraction
 expected_fraction
 enrichment_ratio
-median_enrichment_ratio
+pair_median_enrichment_ratio
+sample_balanced_median_enrichment_ratio
 spearman_rho_23_24
 ```
-
----
 
 ## Published Dicer-analysis metrics
 
@@ -1204,11 +1024,9 @@ steprna_5p_distance
 steprna_3p_distance
 passenger_length
 passenger_recovery_fraction
-steprna_log_odds
+installed stepRNA enrichment/log-ratio output
 steprna_wald_z
 ```
-
----
 
 ## Project-specific Dicer summaries
 
@@ -1219,8 +1037,6 @@ varroa_2nt_fraction_recovered
 Δ_Dicer
 ```
 
----
-
 ## Potential Dicer-derived candidate features
 
 ```text
@@ -1229,100 +1045,95 @@ dicer_specific_log2_contrast
 dicer_general_correlation
 ```
 
-These remain exploratory until reproducibility and independence are demonstrated.
-
----
+These remain exploratory until reproducibility and non-redundancy are demonstrated.
 
 ## Project-specific spatial/transitivity metrics
 
 ```text
 balanced23_anchor_score
 combined23_anchor_score
-F24_AS
-ΔF24_AS
+M_X_down / M_X_up
 D_24AS
 D_24S
 antisense_specific_directionality
+F24_AS_down
+F24_AS_up
+delta_F24_AS
+crosscorr_23_to_24(lag)
+lag_asymmetry_AS_minus_S
 ```
-
-`D_24AS`, `D_24S` and their contrast remain provisional until the final v1.4.1 spatial implementation is recovered.
 
 ---
 
-# 31. Current biological interpretation
+# 28. Current biological interpretation
 
-Current results support the cautious population-level interpretation:
+The working population-level model is:
 
 ```text
 23 nt
-→ more strongly primary/Dicer-associated
+→ more strongly associated with the primary/Dicer-like response
 
-24 nt
-→ more antisense-biased and secondary-associated
-→ but also carries evidence of Dicer/Dicer-like processing
+24 nt antisense
+→ associated with a later/secondary-like population
+→ while still showing evidence compatible with Dicer/Dicer-like processing
 ```
 
-The previous Varroa analyses found significant Dicer-like geometry in both length populations, with stronger evidence for the 23-nt class, and a modest rather than dramatic viral spatial shift toward 24-nt antisense RNA.
+These are population associations, not identities.
 
-This does not mean:
+The pipeline must never simplify this to:
 
 ```text
-all 23-mers are primary
-all 24-mers are secondary
-24-mers are Dicer-independent
+all 23-mers = primary
+all 24-mers = secondary
+24-mers = Dicer-independent
 ```
+
+Natural viral infection also creates its own spatially structured RNA substrates, so Stage 05 provides evidence **consistent with** secondary/transitive biology rather than direct mechanistic proof.
 
 ---
 
-# 32. Metrics deliberately not yet defined
+# 29. Metrics deliberately not yet defined
 
-Do not create these until the empirical evidence supports them:
+Do not create these until later analyses justify them:
 
 ```text
 S23_primary
 S24_secondary
-overall vdCHIBIN score
+overall vdCHIBIN window score
 Dicer-compatibility ranking weight
 transitivity kernel K(d)
 construct-level secondary score
 ```
 
-The canonical viral pipeline should first establish the underlying biology.
-
 ---
 
-# 33. Rule for introducing future metrics
+# 30. Rule for introducing a new metric
 
-Every new metric must document:
+Every future metric must document:
 
-1. name
-2. mathematical definition
-3. whether it is standard, published-method-derived or project-specific
-4. input data
-5. analysis unit
-6. deduplication/weighting rule
-7. normalization
-8. biological question
-9. interpretation
-10. undefined/zero cases
-11. uncertainty method
-12. limitations
-13. relationship to existing metrics
-14. whether the definition was fixed before examining results
+1. name;
+2. mathematical definition;
+3. whether it is standard, published-method-derived, project-specific, historical, or canonical;
+4. input data;
+5. analysis unit;
+6. deduplication/weighting rule;
+7. normalization;
+8. biological question;
+9. interpretation of high/low values;
+10. zero/undefined handling;
+11. uncertainty method;
+12. limitations;
+13. relationship to existing metrics;
+14. whether the definition was fixed before inspecting the result.
 
 No important statistic should exist only inside a Python script.
 
 ---
 
-# 34. Primary methodological sources
+# 31. Main methodological references
 
-The metric framework is grounded in:
-
-* Murcott et al. (2022), **stepRNA**, for computational identification of Dicer cleavage geometry and passenger strands.
-* Experimental and structural Dicer literature showing that Dicer commonly produces short 3′ overhangs but that exact cleavage geometry can vary with substrate.
-* Hierarchical/bootstrap methodology for nested biological data.
-* Benjamini-Hochberg FDR control for related multiple hypothesis tests.
-* Monte-Carlo permutation-test methodology using non-zero corrected empirical P-values.
-* Secondary-siRNA/transitivity literature for the biological concept of secondary small-RNA spread.
-
-Project-specific spatial endpoints are explicitly identified as such rather than presented as published standard statistics.
+- Murcott B, Pawluk RJ, Protasio AV, Akinmusola RY, Lastik D, Hunt VL. 2022. *stepRNA: Identification of Dicer cleavage signatures and passenger strand lengths in small RNA sequences*. Frontiers in Bioinformatics 2:994871. DOI: 10.3389/fbinf.2022.994871.
+- Benjamini Y, Hochberg Y. 1995. *Controlling the False Discovery Rate: A Practical and Powerful Approach to Multiple Testing*. Journal of the Royal Statistical Society Series B 57:289–300.
+- Phipson B, Smyth GK. 2010. *Permutation P-values Should Never Be Zero: Calculating Exact P-values When Permutations Are Randomly Drawn*. Statistical Applications in Genetics and Molecular Biology 9:Article 39.
+- Saravanan V, Berman GJ, Sober SJ. 2020. *Application of the hierarchical bootstrap to multi-level data in neuroscience*. General methodological support for clustered/nested resampling.
+- The uploaded Varroa vsiRNA v1.4.1 strengthened-transitivity code and archived outputs are the exact historical source for the Stage-05 coordinate, anchor, window, weighting, null, and aggregation definitions reproduced here.
