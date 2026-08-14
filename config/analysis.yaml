@@ -1,0 +1,10 @@
+{
+  "stage01": {
+    "length_min": 15,
+    "length_max": 35,
+    "bootstrap_replicates": 10000,
+    "random_seed": 20260814,
+    "ci_method": "percentile",
+    "ci_level": 0.95
+  }
+}
