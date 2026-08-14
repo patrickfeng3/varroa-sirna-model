@@ -1,6 +1,6 @@
 # Varroa vsiRNA Metric Dictionary
 
-**Version:** 0.3  
+**Version:** 0.4  
 **Scope:** Canonical viral pipeline through viral spatial/transitivity-consistency analysis
 
 ---
@@ -63,39 +63,161 @@ Question answered:
 
 > Is the pattern represented across many distinct RNA sequence species rather than being driven by a few very abundant reads?
 
-For Stage 05, identity is exactly:
+For Stage 01, unique-sequence identity is:
+
+```text
+sample × analysis_unit × length × strand × sequence
+```
+
+Equivalently, each distinct `sequence` contributes once within each:
+
+```text
+sample × analysis_unit × length × strand
+```
+
+unit. The same sequence can therefore contribute again in another sample, analysis unit, length, or mapped strand.
+
+For Stage 05, where positional multimapping matters, identity is:
 
 ```text
 virus × strand × length × sequence
 ```
 
-and total sequence weight 1 is divided across all exact compatible loci for that sequence.
+and total sequence weight 1 is divided across all exact compatible loci for that sequence within the relevant sample-virus analysis.
 
 ---
 
-# 4. Basic 23/24 population metrics
+# 4. Stage 01 length-landscape and 23/24 population metrics
+
+## `length_count(L)`
+
+**Class:** Standard/descriptive
+
+Count/weight of eligible viral small RNAs of length `L` within one sample-virus unit and one weighting mode.
+
+For abundance weighting:
+
+```text
+length_count(L)
+    = sum(read-level count for eligible rows of length L)
+```
+
+For unique-sequence weighting:
+
+```text
+length_count(L)
+    = number of distinct Stage 01 sequences of length L
+```
+
+after strand-specific deduplication.
+
+Canonical Stage 01 evaluates `L = 15, ..., 35`.
+
+Raw abundance counts are strongly influenced by viral load and sequencing depth and should not be interpreted as directly normalized cross-sample expression measurements.
+
+## `length_fraction(L)`
+
+**Class:** Standard proportion used as the primary comparable length-spectrum quantity
+
+Within one sample-virus unit and weighting mode:
+
+```text
+length_fraction(L)
+    = length_count(L)
+      / Σ length_count(k),  k = 15,...,35
+```
+
+Range:
+
+```text
+0 to 1
+```
+
+If the 15–35-nt denominator is zero, report `NA`.
+
+Interpretation:
+
+> What fraction of the canonical retained viral small-RNA population belongs to length L?
+
+This normalizes the length spectrum within a sample-virus unit; it does not normalize absolute viral small-RNA load between samples.
+
+## `length_rank(L)`
+
+**Class:** Standard descriptive ranking
+
+Lengths are ordered by descending `length_fraction` within each sample-virus unit and weighting mode.
+
+Use standard competition ranking with minimum rank for ties:
+
+```text
+1, 2, 2, 4, ...
+```
+
+Thus tied lengths receive the same best applicable rank and no arbitrary tie-breaking is introduced.
+
+Interpretation:
+
+```text
+1 = most represented length in that unit
+larger value = lower relative representation
+```
+
+## `top1_indicator(L)` and `top3_indicator(L)`
+
+**Class:** Standard/descriptive
+
+```text
+top1_indicator(L) = 1 if length_rank(L) <= 1 else 0
+top3_indicator(L) = 1 if length_rank(L) <= 3 else 0
+```
+
+Because tied lengths share rank, more than one length may be classified as top 1 or top 3 in a tied unit.
+
+Across sample-virus units, the corresponding fractions are descriptive robustness summaries only; they are not formal hypothesis tests and do not replace sample-balanced summaries.
 
 ## `count_23`
 
 **Class:** Standard/descriptive
 
-Number or weighted abundance of eligible 23-nt viral small RNAs under the stated weighting mode.
+Total eligible 23-nt count/weight within the stated sample-virus unit and weighting mode:
 
-Always retain sample, virus, strand, and weighting mode.
+```text
+count_23 = count_23_sense + count_23_antisense
+```
 
 ## `count_24`
 
-Equivalent quantity for eligible 24-nt viral small RNAs.
+Equivalent quantity for 24-nt viral small RNAs:
 
-## `antisense_fraction`
+```text
+count_24 = count_24_sense + count_24_antisense
+```
+
+## `antisense_fraction_23`
 
 **Class:** Standard/descriptive
 
 ```text
-antisense_fraction = antisense / (sense + antisense)
+antisense_fraction_23
+    = count_23_antisense
+      / (count_23_sense + count_23_antisense)
 ```
 
-Interpretation:
+If the denominator is zero, report `NA`.
+
+## `antisense_fraction_24`
+
+**Class:** Standard/descriptive
+
+```text
+antisense_fraction_24
+    = count_24_antisense
+      / (count_24_sense + count_24_antisense)
+```
+
+If the denominator is zero, report `NA`.
+
+Interpretation for either metric:
 
 ```text
 0.5  = equal sense and antisense contribution
@@ -103,19 +225,111 @@ Interpretation:
 <0.5 = sense-biased
 ```
 
-If the denominator is zero, report `NA`.
+**Naming rule:** `antisense_fraction_24` must not be abbreviated to `F24_AS`. Stage 05 reserves `F24_AS`-type notation for the different concept of 24-nt composition within the antisense 23+24 population.
 
-## `sense_fraction`
+## `sense_fraction_23` and `sense_fraction_24`
 
 ```text
-sense_fraction = sense / (sense + antisense)
+sense_fraction_23
+    = count_23_sense / (count_23_sense + count_23_antisense)
+
+sense_fraction_24
+    = count_24_sense / (count_24_sense + count_24_antisense)
 ```
 
 When defined:
 
 ```text
-sense_fraction + antisense_fraction = 1
+sense_fraction_23 + antisense_fraction_23 = 1
+sense_fraction_24 + antisense_fraction_24 = 1
 ```
+
+## `delta_antisense_fraction_24_minus_23`
+
+**Class:** Standard difference in proportions used as a project-specific descriptive effect size
+
+```text
+delta_antisense_fraction_24_minus_23
+    = antisense_fraction_24
+      - antisense_fraction_23
+```
+
+Interpretation:
+
+```text
+>0 = 24 nt is more antisense-biased than 23 nt
+ 0 = equal antisense fraction
+<0 = 24 nt is less antisense-biased than 23 nt
+```
+
+Range when both fractions are defined:
+
+```text
+-1 to +1
+```
+
+A value of `+0.30` means the 24-nt population is 30 percentage points more antisense-biased than the 23-nt population in that analysis unit.
+
+This is a population contrast, not evidence that an individual 24-mer is secondary or an individual 23-mer is primary.
+
+## `length23_fraction_among_23_24`
+
+**Class:** Standard/descriptive composition
+
+```text
+length23_fraction_among_23_24
+    = count_23 / (count_23 + count_24)
+```
+
+## `length24_fraction_among_23_24`
+
+```text
+length24_fraction_among_23_24
+    = count_24 / (count_23 + count_24)
+```
+
+When defined:
+
+```text
+length23_fraction_among_23_24
++ length24_fraction_among_23_24
+= 1
+```
+
+If `count_23 + count_24 = 0`, both are `NA`.
+
+These are not the Stage 05 `F24_AS` quantities.
+
+## `sample_balanced_median(metric)`
+
+**Class:** Project-specific canonical aggregation rule
+
+For a continuous Stage 01 pair-level metric:
+
+1. calculate the metric separately for each eligible sample-virus unit;
+2. within each sample, take the median across eligible virus units;
+3. across samples, take the median of those sample-level values.
+
+Primary uncertainty is obtained by resampling biological samples with replacement and recomputing the summary while retaining each selected sample's virus observations together.
+
+This prevents samples containing more eligible viruses from automatically receiving more independent weight.
+
+For length-spectrum metrics, this rule is applied separately for every length and weighting mode.
+
+## `sample_clustered_CI95`
+
+**Class:** Standard cluster/bootstrap uncertainty approach applied canonically
+
+A 95% bootstrap confidence interval obtained by resampling top-level biological samples with replacement and recomputing the pre-specified sample-balanced statistic.
+
+The implementation must record:
+
+- number of requested bootstrap replicates;
+- number of valid replicates;
+- random seed;
+- interval construction method.
+
+Stage 01 emphasizes effect sizes and confidence intervals; it does not require P-values simply to describe prominence of lengths or strand bias.
 
 ---
 
@@ -997,13 +1211,25 @@ The archived `antisense_specific_directionality` endpoint did not show convincin
 
 # 27. Metric classes by biological role
 
-## Descriptive population metrics
+## Stage 01 descriptive population metrics
 
 ```text
+length_count(L)
+length_fraction(L)
+length_rank(L)
+top1_indicator(L)
+top3_indicator(L)
 count_23
 count_24
-sense_fraction
-antisense_fraction
+sense_fraction_23
+antisense_fraction_23
+sense_fraction_24
+antisense_fraction_24
+delta_antisense_fraction_24_minus_23
+length23_fraction_among_23_24
+length24_fraction_among_23_24
+sample_balanced_median(metric)
+sample_clustered_CI95
 ```
 
 ## Empirical sequence metrics

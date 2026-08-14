@@ -1,7 +1,7 @@
 # Canonical Varroa vsiRNA Pipeline Specification
 
-**Specification version:** 0.3  
-**Status:** Scientific specification before canonical implementation  
+**Specification version:** 0.4  
+**Status:** Stage 00 implemented and validated; Stage 01 scientifically specified before implementation  
 **Scope:** Viral small-RNA analysis through viral spatial/transitivity-consistency analysis  
 **Host transitivity:** Excluded  
 **vdCHIBIN ranking:** Excluded from this build
@@ -23,7 +23,7 @@ Validated legacy core
         ↓
 00 Validate legacy core
         ↓
-01 Fixed 23/24-nt populations
+01 Viral length landscape and fixed 23/24-nt populations
         ↓
 02 Terminal nucleotide enrichment
         ↓
@@ -81,6 +81,19 @@ The canonical pipeline reads these products but does not silently reuse old down
 ---
 
 ## 3. General analysis principles
+
+### 3.0 Canonical evidence-building principle
+
+The new pipeline rebuilds the biological analysis in a defined sequence from validated frozen inputs. Historical results may guide expectations and later serve as regression/validation targets, but they are **not treated as conclusions already established by the new pipeline**.
+
+For each stage:
+
+1. define the analysis from the authoritative specification;
+2. calculate the result from the validated upstream inputs;
+3. interpret the newly generated result;
+4. only then compare it with historical outputs.
+
+If a canonical result differs materially from the historical analysis, the discrepancy must be investigated and reported rather than hidden or forced to match. Historical downstream result tables must never be used as inputs to recreate the canonical result they are supposed to validate.
 
 ### 3.1 Analysis levels
 
@@ -147,8 +160,8 @@ results/descriptive/eligibility.tsv
 config/virus_catalog.tsv
 tables/<sample>/<sample>.read_level_features.tsv.gz
 alignments/<sample>.all_viruses.exact.sam
-references/consensus/<sample>.<virus>.final.fa
-references/consensus/<sample>.<virus>.final.background_masked.fa
+references/consensus/<sample>.<analysis_unit>.final.fa
+references/consensus/<sample>.<analysis_unit>.final.background_masked.fa
 ```
 
 plus the relevant sample/reference manifests and provenance records.
@@ -180,69 +193,391 @@ A missing or inconsistent required dependency causes an explicit failure. There 
 
 ---
 
-# 01 — Fixed 23-nt and 24-nt viral small-RNA populations
+# 01 — Viral length landscape and fixed 23/24-nt populations
 
-## Biological question
+## Purpose
 
-What are the abundance, strand distribution, and cross-sample behaviour of the 23-nt and 24-nt viral small-RNA populations?
+Stage 01 is the first biological analysis produced by the canonical pipeline.
 
-## Inputs
+It must first reconstruct the viral small-RNA length landscape from the validated read-level inputs and only then perform the dedicated 23/24-nt comparison.
 
-Validated read-level feature tables, eligibility table, and virus metadata.
+Historical knowledge that 23- and 24-nt vsiRNAs are prominent is treated as an expectation to test, not as an assumption built into the calculation.
+
+Stage 01 therefore has two linked parts:
+
+- **01A — 15–35-nt viral small-RNA length landscape**
+- **01B — dedicated 23/24-nt population and strand analysis**
+
+No Dicer, terminal-enrichment, transitivity, accessibility, or candidate-design inference is performed in Stage 01.
+
+---
+
+## 01A — Reconstruct the 15–35-nt viral small-RNA length landscape
+
+### Biological question
+
+Across primary-eligible Varroa virus infections, which small-RNA lengths are prominent, and is that pattern supported both by accumulated abundance and by diversity of distinct RNA sequences?
+
+### Why 15–35 nt?
+
+The corrected upstream preprocessing retained the 15–35-nt small-RNA range. Stage 01 reconstructs the complete retained viral length spectrum rather than beginning by filtering to 23 and 24 nt.
+
+Rows outside 15–35 nt, if encountered in the validated read-level tables, are reported in Stage 01 QC and are not included in the canonical length-spectrum denominator.
+
+### Inputs
+
+Validated:
+
+```text
+tables/<sample>/<sample>.read_level_features.tsv.gz
+results/descriptive/eligibility.tsv
+```
+
+Metadata required for reporting are taken from the eligibility table, including:
+
+- `sample`;
+- `analysis_unit`;
+- `biological_virus`;
+- `polarity`;
+- `primary_eligible`.
 
 No remapping is performed.
 
-## Primary inclusion criteria
+### Canonical inclusion criteria
 
-Use reads satisfying the validated equivalents of:
+For the length-spectrum analysis, retain rows satisfying:
 
 ```text
+sample × virus corresponds to a primary_eligible sample × analysis_unit pair
 mapping_mode = exact
 virus_assignment = assigned
-primary_eligible = true
-length = 23 or 24 nt
-strand = sense or antisense
+strand ∈ {sense, antisense}
+length ∈ [15, 35]
 ```
+
+The read-level `virus` field is matched to eligibility `analysis_unit`.
 
 Cross-virus ambiguous reads are excluded from virus-specific primary summaries.
 
-## Required dimensions
+### Weighting mode A — abundance
+
+For each eligible row, abundance contribution is the numeric read-level `count` field.
+
+Do not use the number of table rows as a substitute for abundance.
+
+For each sample-virus unit and length `L`:
+
+```text
+length_count_abundance(L)
+    = sum(count for eligible rows of length L)
+```
+
+### Weighting mode B — true unique sequence
+
+For Stage 01, a distinct sequence is defined within:
+
+```text
+sample × analysis_unit × length × strand
+```
+
+Each distinct sequence contributes exactly 1 within that unit, regardless of its read-level abundance or how many read names carry it.
+
+The same literal sequence may count again in another sample or another biological analysis unit because the biological unit is different.
+
+For a length-spectrum total, unique sense and unique antisense sequence counts are summed after strand-specific deduplication.
+
+### Length fraction
+
+Raw counts are retained, but the primary comparable length-spectrum quantity is the within-pair fraction:
+
+```text
+length_fraction(L)
+    = length_count(L)
+      / sum(length_count(15), ..., length_count(35))
+```
+
+This is calculated separately for abundance and unique-sequence weighting.
+
+If the 15–35-nt denominator is zero, all length fractions for that unit are `NA` and the unit is reported in QC.
+
+### Length rank
+
+Within each sample-virus unit and weighting mode, lengths are ranked from highest to lowest `length_fraction`.
+
+Use **standard competition ranking with the minimum rank for ties**:
+
+```text
+1, 2, 2, 4, ...
+```
+
+Thus tied lengths receive the same best applicable rank and no arbitrary genomic or lexical tie-breaking is introduced.
+
+A length is descriptively `top1` when `rank <= 1` and `top3` when `rank <= 3`.
+
+Top-1/top-3 frequencies are descriptive robustness summaries, not formal hypothesis tests.
+
+### Pair-level output
+
+For every:
+
+```text
+sample × analysis_unit × weighting_mode × length
+```
+
+retain at least:
+
+- sample;
+- analysis unit;
+- biological virus;
+- polarity;
+- weighting mode;
+- length;
+- length count;
+- length fraction;
+- length rank;
+- top-1 indicator;
+- top-3 indicator.
+
+### Sample-level aggregation
+
+Several viruses can occur in the same biological sample. For the canonical sample-balanced view, calculate within each sample and weighting mode:
+
+- median `length_fraction` across eligible sample-virus units for each length;
+- median `length_rank` across eligible sample-virus units for each length;
+- number of contributing sample-virus units.
+
+This preserves virus-level calculations while preventing samples containing more viruses from automatically contributing more independent weight to the cross-dataset summary.
+
+### Across-dataset summary
+
+For each length and weighting mode, report at minimum:
+
+- sample-balanced median length fraction;
+- sample-clustered 95% bootstrap confidence interval for that median;
+- sample-balanced median rank;
+- number of contributing biological samples;
+- number of contributing sample-virus units;
+- pair-level fraction of sample-virus units in which the length is top 1;
+- pair-level fraction of sample-virus units in which the length is top 3.
+
+The top-1/top-3 pair-level frequencies are explicitly descriptive and must not replace the sample-balanced primary summary.
+
+### Statistical emphasis
+
+Stage 01A is primarily descriptive. It does not require a P-value to decide which lengths are prominent.
+
+Prominence is evaluated from effect-size summaries, distributions, ranks, reproducibility across units, and sample-clustered uncertainty.
+
+Only after the canonical Stage 01A outputs have been generated may they be compared with the historical length-distribution results.
+
+---
+
+## 01B — Dedicated 23/24-nt population and strand analysis
+
+### Biological question
+
+Once the full length landscape has been reconstructed, how do the 23-nt and 24-nt viral small-RNA populations differ in abundance, sequence diversity, and strand bias?
+
+### Inclusion criteria
+
+Use the same Stage 01A canonical population definition, then restrict to:
+
+```text
+length ∈ {23, 24}
+```
+
+No additional biological eligibility filter is introduced.
+
+### Four primary populations
+
+For every eligible sample-virus unit, preserve separately:
+
+```text
+23 sense      (23S)
+23 antisense  (23AS)
+24 sense      (24S)
+24 antisense  (24AS)
+```
+
+Calculate them under both abundance and unique-sequence weighting.
+
+### Counts
+
+For each weighting mode, retain:
+
+```text
+n23_sense
+n23_antisense
+n23_total
+n24_sense
+n24_antisense
+n24_total
+```
+
+In abundance mode these are sums of read-level `count`.
+
+In unique-sequence mode these are numbers of distinct sequences under the Stage 01 uniqueness definition.
+
+### Strand fractions
+
+For each sample-virus unit and weighting mode:
+
+```text
+antisense_fraction_23
+    = 23AS / (23S + 23AS)
+
+antisense_fraction_24
+    = 24AS / (24S + 24AS)
+```
+
+If the relevant denominator is zero, report `NA`.
+
+Do **not** call `antisense_fraction_24` `F24_AS`; the latter name is reserved in Stage 05 for the different quantity describing 24-nt composition within the antisense 23+24 population.
+
+### Direct 24-vs-23 strand-bias effect size
+
+Calculate:
+
+```text
+delta_antisense_fraction_24_minus_23
+    = antisense_fraction_24
+      - antisense_fraction_23
+```
+
+Interpretation:
+
+```text
+>0 = the 24-nt population is more antisense-biased than the 23-nt population
+ 0 = equal antisense fraction
+<0 = the 24-nt population is less antisense-biased
+```
+
+This is a descriptive population effect size, not a mechanistic classification of individual RNAs.
+
+### 23/24 composition
+
+For descriptive context, also calculate:
+
+```text
+length23_fraction_among_23_24
+    = n23_total / (n23_total + n24_total)
+
+length24_fraction_among_23_24
+    = n24_total / (n23_total + n24_total)
+```
+
+If `n23_total + n24_total = 0`, both are `NA`.
+
+These quantities describe the relative representation of the two lengths and are distinct from Stage 05 `F24_AS`.
+
+### Sample-level aggregation
+
+Within each biological sample and weighting mode, take the median across eligible sample-virus units for continuous pair-level metrics such as:
+
+- `antisense_fraction_23`;
+- `antisense_fraction_24`;
+- `delta_antisense_fraction_24_minus_23`;
+- `length23_fraction_among_23_24`;
+- `length24_fraction_among_23_24`.
+
+Retain the number of contributing virus units.
+
+Raw counts remain available at pair level and may be summarized descriptively, but the primary cross-dataset biological comparison should emphasize fractions/effect sizes rather than pooled raw read totals.
+
+### Across-dataset aggregation
+
+For each weighting mode, report sample-balanced point estimates and sample-clustered 95% bootstrap confidence intervals for the principal fraction/effect-size metrics.
 
 Retain:
 
-- sample;
-- analysis unit / virus;
-- biological virus where distinct;
-- viral polarity;
-- strand;
-- length;
-- sequence;
-- abundance.
+- number of contributing samples;
+- number of contributing sample-virus units;
+- pair-balanced descriptive summaries for comparison;
+- no automatic formal significance test unless a later pre-specified biological question requires one.
 
-## Required summaries
+### Interpretation limits
 
-For 23 nt and 24 nt separately, calculate:
+Stage 01 may establish observations such as:
 
-- total abundance;
-- distinct sequence count;
-- sense abundance/count;
-- antisense abundance/count;
-- sense fraction;
-- antisense fraction;
-- pair-level 23:24 relationships;
-- sample-balanced and pair-balanced across-dataset summaries.
+- 23 and/or 24 nt are prominent in the newly reconstructed length landscape;
+- one length class is more abundant or sequence-diverse than another;
+- 24 nt is more or less antisense-biased than 23 nt;
+- these patterns recur across samples and viruses.
 
-## Outputs
+Stage 01 must **not** conclude from length and strand bias alone that:
+
+```text
+23 nt = primary Dicer products
+24 nt = secondary RdRP products
+all 23-mers are primary
+all 24-mers are secondary
+```
+
+Those mechanistic questions belong to later stages.
+
+---
+
+## Stage 01 QC/accounting
+
+Write a compact accounting table documenting at minimum:
+
+- number of samples represented in the eligibility table;
+- number of primary-eligible sample-virus units;
+- read-level rows examined;
+- exact + assigned rows retained;
+- abundance retained in the 15–35-nt range;
+- distinct Stage 01 sequences retained;
+- rows outside the canonical 15–35-nt range;
+- 23-nt abundance and unique-sequence totals;
+- 24-nt abundance and unique-sequence totals;
+- zero-denominator/zero-signal units;
+- any unexpected categorical value encountered.
+
+Unexpected categories must be reported rather than silently coerced.
+
+---
+
+## Stage 01 outputs
 
 ```text
 results/01_viral_23_24/
-    23_24_counts_by_pair.tsv
-    23_24_fractions_by_pair.tsv
-    23_24_strand_bias_by_pair.tsv
-    23_24_across_samples.tsv
-    23_24_across_pairs.tsv
-    figures/
+│
+├── qc/
+│   └── stage01_accounting.tsv
+│
+├── length_spectrum/
+│   ├── length_distribution_by_pair.tsv
+│   ├── length_distribution_by_sample.tsv
+│   └── length_distribution_across_dataset.tsv
+│
+├── fixed_23_24/
+│   ├── 23_24_counts_by_pair.tsv
+│   ├── 23_24_fractions_by_pair.tsv
+│   ├── 23_24_by_sample.tsv
+│   └── 23_24_across_dataset.tsv
+│
+└── figures/
 ```
+
+### Minimum figures
+
+Generate only figures with a clear scientific purpose:
+
+1. **15–35-nt length spectrum** — abundance and unique-sequence views, showing the newly reconstructed length landscape without assuming 23/24 dominance.
+2. **23-vs-24 antisense-fraction comparison** — pair-level `antisense_fraction_23` versus `antisense_fraction_24`, with the equality line shown for interpretation.
+3. **23/24 strand-bias distributions** — distributions of the two antisense fractions, separated clearly by weighting mode.
+
+Avoid redundant cosmetic variants.
+
+---
+
+## Historical comparison rule
+
+Historical length-distribution and fixed-23/24 results are **not inputs** to Stage 01.
+
+After all canonical Stage 01 outputs are calculated and frozen for the run, historical outputs may be used as regression/interpretive checks.
+
+A material discrepancy must be documented and investigated. The canonical calculation must never be altered solely to force agreement with the historical result.
 
 ---
 
