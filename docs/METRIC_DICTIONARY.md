@@ -1,6 +1,6 @@
 # Varroa vsiRNA Metric Dictionary
 
-**Version:** 0.10  
+**Version:** 0.12  
 **Scope:** Canonical viral pipeline through viral spatial/transitivity-consistency analysis
 
 ---
@@ -2611,10 +2611,249 @@ Natural viral infection creates structured complementary RNA substrates, and vir
 
 Stages 03–05 therefore provide biological/pathway context while remaining deliberately separate from per-window vdCHIBIN ranking.
 
+Stage 06 begins the design-facing pipeline by locking XM_022792159.1 and enumerating all 688 complete 23-nt intervals and all 687 complete 24-nt intervals (1,375 total), with exact sense-target and antisense-guide orientation. The two lengths remain parallel analysis strata. Stage 06 is sequence/coordinate preparation only and introduces no efficacy ranking.
+
 ---
 
 
-# 29. Metrics deliberately not yet defined
+# 29. Stage 06 Vd-CHIBIN target/candidate definitions
+
+Stage 06 metrics are coordinate/identity definitions, not efficacy scores.
+
+## `candidate_id`
+
+**Class:** Canonical identifier
+
+```text
+XM_022792159.1__LENGTHnt__START_END
+```
+
+with zero-padded 1-based inclusive coordinates.
+
+Examples:
+
+```text
+XM_022792159.1__23nt__0001_0023
+XM_022792159.1__24nt__0001_0024
+```
+
+A repeated sequence at a different coordinate or at a different candidate length receives a different candidate ID.
+
+## `candidate_length_nt`
+
+**Class:** Canonical project parameter
+
+Allowed values:
+
+```text
+23
+24
+```
+
+The two lengths are parallel Stage 06 analysis strata.
+
+They are design lengths, not pathway labels:
+
+```text
+23 nt ≠ automatically primary/Dicer
+24 nt ≠ automatically secondary/RdRP
+```
+
+## `start_1based`
+
+**Class:** Canonical coordinate
+
+First nucleotide of the target interval on the Vd-CHIBIN mRNA, using 1-based inclusive coordinates.
+
+Allowed canonical ranges:
+
+```text
+23 nt: 1–688
+24 nt: 1–687
+```
+
+## `end_1based`
+
+**Class:** Canonical coordinate
+
+```text
+end_1based = start_1based + candidate_length_nt - 1
+```
+
+Every candidate ends at or before transcript coordinate 710.
+
+## `target_sequence_dna`
+
+**Class:** Canonical sequence identity
+
+Exact uppercase sense/transcript slice from the locked XM_022792159.1 sequence, represented with DNA alphabet `A/C/G/T`.
+
+Length must equal `candidate_length_nt`.
+
+## `target_sequence_rna`
+
+**Class:** Canonical sequence identity
+
+```text
+target_sequence_rna
+    = target_sequence_dna with T→U
+```
+
+represented 5′→3′ in the Vd-CHIBIN mRNA/sense orientation.
+
+## `antisense_guide_sequence_rna`
+
+**Class:** Canonical sequence identity
+
+```text
+antisense_guide_sequence_rna
+    = reverse_complement(target_sequence_rna)
+```
+
+represented 5′→3′.
+
+Important:
+
+```text
+guide 5′ end ↔ complement of target interval 3′ end
+guide 3′ end ↔ complement of target interval 5′ end
+```
+
+This rule applies identically to 23-nt and 24-nt candidates.
+
+## `start_region`
+
+**Class:** Canonical annotation
+
+Transcript annotation containing `start_1based`.
+
+Allowed values:
+
+```text
+5_prime_UTR
+CDS
+3_prime_UTR
+```
+
+This is a grouping label only.
+
+## `end_region`
+
+**Class:** Canonical annotation
+
+Transcript annotation containing `end_1based`.
+
+## `overlap_regions`
+
+**Class:** Canonical annotation
+
+Ordered semicolon-separated set of transcript regions touched by the complete candidate interval.
+
+Examples:
+
+```text
+5_prime_UTR
+5_prime_UTR;CDS
+CDS
+CDS;3_prime_UTR
+3_prime_UTR
+```
+
+## `crosses_annotation_boundary`
+
+**Class:** Canonical boolean annotation
+
+```text
+TRUE  if start_region != end_region
+FALSE otherwise
+```
+
+Cross-boundary candidates remain valid candidate intervals.
+
+## Canonical Stage 06 counts
+
+### 23 nt
+
+```text
+total candidates = 688
+
+start_region:
+5_prime_UTR = 329
+CDS         = 336
+3_prime_UTR = 23
+
+fully within one region:
+5_prime_UTR = 307
+CDS         = 314
+3_prime_UTR = 23
+
+cross-boundary:
+5_prime_UTR→CDS = 22
+CDS→3_prime_UTR = 22
+total            = 44
+```
+
+### 24 nt
+
+```text
+total candidates = 687
+
+start_region:
+5_prime_UTR = 329
+CDS         = 336
+3_prime_UTR = 22
+
+fully within one region:
+5_prime_UTR = 306
+CDS         = 313
+3_prime_UTR = 22
+
+cross-boundary:
+5_prime_UTR→CDS = 23
+CDS→3_prime_UTR = 23
+total            = 46
+```
+
+### Combined
+
+```text
+total Stage 06 candidates = 1,375
+```
+
+These are deterministic accounting checks rather than biological metrics.
+
+## Parallel-length carry-forward rule
+
+Stage 07 and later candidate-level analyses should preserve:
+
+```text
+candidate_length_nt
+```
+
+as an explicit stratum.
+
+Within-length ranking and between-length comparison are different analytical operations.
+
+A metric may be compared directly between 23 nt and 24 nt only if its definition and normalization support such a comparison.
+
+## Stage 06 non-metrics
+
+The following are intentionally **not** defined in Stage 06:
+
+```text
+accessibility score
+thermodynamic asymmetry score
+terminal-enrichment candidate score
+Dicer/geometry score
+transitivity score
+aggregate candidate score
+candidate rank
+```
+
+---
+
+
+# 30. Metrics deliberately not yet defined
 
 Do not create these until later analyses justify them:
 
@@ -2629,7 +2868,7 @@ construct-level secondary score
 
 ---
 
-# 30. Rule for introducing a new metric
+# 31. Rule for introducing a new metric
 
 Every future metric must document:
 
@@ -2652,7 +2891,7 @@ No important statistic should exist only inside a Python script.
 
 ---
 
-# 31. Main methodological references
+# 32. Main methodological references
 
 - Murcott B, Pawluk RJ, Protasio AV, Akinmusola RY, Lastik D, Hunt VL. 2022. *stepRNA: Identification of Dicer cleavage signatures and passenger strand lengths in small RNA sequences*. Frontiers in Bioinformatics 2:994871. DOI: 10.3389/fbinf.2022.994871.
 - Benjamini Y, Hochberg Y. 1995. *Controlling the False Discovery Rate: A Practical and Powerful Approach to Multiple Testing*. Journal of the Royal Statistical Society Series B 57:289–300.
