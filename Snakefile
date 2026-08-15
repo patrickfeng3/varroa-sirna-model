@@ -10,6 +10,7 @@ else:
 
 include: "workflow/rules/validate_legacy_core.smk"
 include: "workflow/rules/stage01.smk"
+include: "workflow/rules/stage02.smk"
 
 
 rule all:
@@ -24,3 +25,11 @@ rule all:
         "results/01_viral_23_24/fixed_23_24/23_24_fractions_by_pair.tsv",
         "results/01_viral_23_24/fixed_23_24/23_24_by_sample.tsv",
         "results/01_viral_23_24/fixed_23_24/23_24_across_dataset.tsv",
+        "results/02_terminal_enrichment/qc/stage02_accounting.tsv",
+        "results/02_terminal_enrichment/observed/terminal_observed_by_pair.tsv",
+        "results/02_terminal_enrichment/background/terminal_expected_by_pair.tsv",
+        "results/02_terminal_enrichment/enrichment/terminal_enrichment_by_pair.tsv",
+        "results/02_terminal_enrichment/enrichment/terminal_enrichment_by_sample.tsv",
+        "results/02_terminal_enrichment/enrichment/terminal_enrichment_across_dataset.tsv",
+        "results/02_terminal_enrichment/enrichment/terminal_enrichment_pooled_abundance.tsv",
+        "results/02_terminal_enrichment/comparisons/enrichment_23_vs_24.tsv",
