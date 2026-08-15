@@ -1,7 +1,7 @@
 # Canonical Varroa vsiRNA Pipeline Specification
 
-**Specification version:** 0.9  
-**Status:** Stages 00–04 implemented and validated; Stage 05 scientifically specified before implementation  
+**Specification version:** 0.10  
+**Status:** Stages 00–05 implemented and validated; Stage 06 is the next analysis stage  
 **Scope:** Viral small-RNA analysis through viral spatial/transitivity-consistency analysis  
 **Host transitivity:** Excluded  
 **vdCHIBIN ranking:** Excluded from this build
@@ -34,12 +34,14 @@ Validated legacy core
 05 Viral spatial/transitivity-consistency analysis
 ```
 
-A key reproducibility principle is that Stage 05 has two named outputs:
+A key reproducibility principle is that Stage 05 has two logically separate branches:
 
-- **historical_v1.4.1_replication** — reproduces the uploaded v1.4.1 algorithm exactly enough to match its archived results and terminology.
-- **canonical_transitivity_analysis** — preserves the spatial endpoints of v1.4.1 but improves cross-dataset inference by respecting sample-level clustering and uses mechanism-neutral interpretation.
+- **historical v1.4.1 specification reconstruction** — reconstructs the documented historical algorithm from frozen canonical inputs and compares observed effect sizes with archived checkpoints.
+- **canonical_transitivity_analysis** — preserves the spatial endpoints but uses sample-balanced inference and mechanism-neutral interpretation.
 
-The historical result is a regression target, not an input to the canonical calculation.
+The original v1.4.1 source/result package and exact historical RNG stream are unavailable in the currently audited project environment. Therefore the historical branch must not be described as an exact source-code or Monte Carlo replication. Its observed effect-size regression passed; its historical permutation P/BH stream was not exactly reproduced and is retained as a provenance limitation.
+
+Historical checkpoints are regression targets only, never analytical inputs.
 
 Stage 05 is an **analysis-only stage**. It does not create a vdCHIBIN candidate score, does not alter Stage 02–04 ranking features, and does not assign 23- or 24-nt populations to a biochemical pathway.
 
@@ -2634,26 +2636,36 @@ It does **not**:
 
 Any later use of Stage 05 in construct-level design interpretation would require a separate, prospectively documented decision after the Stage 05 results are reviewed.
 
-## 05.2 Audited historical reference implementation
+## 05.2 Historical v1.4.1 provenance status
 
-The exact uploaded v1.4.1 reference package is:
+The historical strengthened-transitivity method is retained as a **specification reconstruction**, not an exact source-code replication.
 
-```text
-Varroa_vsiRNA_v1.4.1_strengthened_transitivity/
-    analysis_tools/analyse_strengthened_transitivity.py
-    tests/test_strengthened_transitivity.py
-    docs/ACADEMIC_BASIS_AND_INTERPRETATION.md
-    run_strengthened_transitivity.py
-```
+During canonical Stage 05 implementation, the named original v1.4.1 source/result packages could not be located in either:
 
-The corresponding archived result package is:
+- the canonical repository; or
+- the frozen read-only legacy core.
+
+Accordingly record:
 
 ```text
-Varroa_v1.4.1_strengthened_transitivity_results/
+historical_source_package_status = unavailable
+historical_rng_stream_status = unavailable
+historical_raw_p_checkpoint_status = unavailable
+historical_effect_size_regression = PASS
+historical_permutation_regression = NOT_EXACTLY_REPRODUCED
 ```
 
-The canonical repository must preserve these packages outside the executable workflow or document their checksums/provenance so that the historical algorithm is auditable.
+The historical observed effect-size checkpoints were reproduced within the documented approximate tolerance after coordinate logic was corrected.
 
+The historical permutation/BH values were **not** forced to match. The implementation must not alter seed, iteration order, shift rules, endpoints, anchor definitions, or weighting merely to reproduce archived Monte Carlo values when the exact historical RNG provenance is unavailable.
+
+For backwards-compatible output paths, a directory named:
+
+```text
+historical_v1.4.1_replication/
+```
+
+may be retained, but its provenance/manifest must explicitly state that the contents are a **specification reconstruction**.
 ## 05.3 Historical v1.4.1 default parameters
 
 Exact defaults recovered from code:
@@ -3059,6 +3071,111 @@ The corresponding archived `antisense_specific_directionality` results are not s
 
 These numbers are **regression checkpoints only**. They are never loaded as inputs to the new analysis.
 
+## 05.24A Validated canonical Stage 05 result
+
+Canonical Stage 05 completed successfully with:
+
+```text
+targeted tests                = 21/21 PASS
+dry-run                       = Stage 05 job only
+runtime                       = 193.757 s
+QC                            = 11 PASS, 1 WARN, 0 FAIL, 2 INFO
+samples                       = 14
+eligible +ssRNA units         = 19
+biological viruses            = 3
+metadata conflicts            = 0
+strand mismatches             = 0
+weight-normalization deviation= 0
+```
+
+The three contributing viruses are:
+
+```text
+BMLV
+VDV-5
+VDV-9
+```
+
+The single QC warning records two unit/weighting/anchor combinations with fewer than the required number of retained anchors. This is an estimability warning, not a coordinate/strand/normalization failure.
+
+### Primary endpoint 1 — antisense 23:24 composition
+
+The sample-balanced `delta_F24_AS` result shows the strongest and most reproducible positive spatial association at 250–500 nt.
+
+Key canonical estimates:
+
+| Weighting | Anchor | Window | Estimate | 95% bootstrap CI | Raw permutation P | BH P |
+|---|---|---:|---:|---:|---:|---:|
+| abundance | balanced23 | 250 | +0.006185 | [-0.000957, +0.015907] | 0.024995 | 0.037493 |
+| abundance | balanced23 | 500 | +0.016160 | [+0.007511, +0.025209] | 0.002000 | 0.007199 |
+| abundance | combined23 | 250 | +0.005753 | [+0.001319, +0.011406] | 0.002400 | 0.007199 |
+| abundance | combined23 | 500 | +0.013266 | [+0.006500, +0.019799] | 0.002999 | 0.007199 |
+| unique_sequence | balanced23 | 250 | +0.003698 | [+0.002126, +0.006149] | 0.006999 | 0.011998 |
+| unique_sequence | balanced23 | 500 | +0.003344 | [+0.000876, +0.006022] | 0.000400 | 0.004799 |
+| unique_sequence | combined23 | 250 | +0.001928 | [-0.001638, +0.003904] | 0.005199 | 0.010398 |
+| unique_sequence | combined23 | 500 | +0.002153 | [+0.000332, +0.005789] | 0.001000 | 0.005999 |
+
+All eight pre-specified 250/500-nt combinations are positive and BH-significant in the spatial permutation analysis.
+
+The 100-nt analyses do not show a consistent BH-significant positive shift.
+
+Interpretation:
+
+> downstream regions around 23-nt spatial hotspots contain a modestly larger **fraction** of 24-nt antisense molecules within the combined 23AS+24AS population, particularly over 250–500 nt.
+
+The effect is a change in composition, not a direct percentage increase in total small-RNA abundance.
+
+### Primary endpoint 2 — antisense-specific absolute directionality
+
+No pre-specified combination shows evidence for **positive** antisense-specific 24-nt downstream directionality after BH correction:
+
+```text
+BH-adjusted P = 1.0 for all 12 combinations
+```
+
+Several point estimates are close to zero or negative. Some bootstrap intervals for unique-sequence analyses are entirely negative; because the pre-specified permutation alternative tests for a positive downstream effect, these observations do not support the hypothesised positive directionality endpoint.
+
+Therefore the canonical result is:
+
+> evidence for a downstream **23:24 antisense compositional shift**, but no evidence for an absolute antisense-specific downstream wave of 24-nt signal relative to the 24S control.
+
+### Leave-one-virus-out robustness
+
+For all eight BH-significant 250/500-nt `delta_F24_AS` results, leave-one-virus-out estimates remained positive.
+
+Observed leave-one-virus-out ranges:
+
+| Weighting | Anchor | Window | LOO estimate range |
+|---|---|---:|---:|
+| abundance | balanced23 | 250 | +0.004906 to +0.006669 |
+| abundance | balanced23 | 500 | +0.012925 to +0.016160 |
+| abundance | combined23 | 250 | +0.004996 to +0.010006 |
+| abundance | combined23 | 500 | +0.012620 to +0.016646 |
+| unique_sequence | balanced23 | 250 | +0.002397 to +0.004277 |
+| unique_sequence | balanced23 | 500 | +0.001491 to +0.003947 |
+| unique_sequence | combined23 | 250 | +0.000167 to +0.001928 |
+| unique_sequence | combined23 | 500 | +0.001388 to +0.002775 |
+
+This shows that the positive compositional shift is not solely dependent on any one of BMLV, VDV-5, or VDV-9.
+
+### Historical regression status
+
+Observed historical effect sizes match the archived approximate checkpoints.
+
+Exact historical permutation/BH reproduction is unresolved because the original historical source/RNG stream and raw P checkpoints are unavailable.
+
+The archived versus reconstructed BH values for the historical unique-sequence × balanced23 `delta_F24_AS` branch were:
+
+| Window | Archived BH | Reconstructed BH |
+|---|---:|---:|
+| 100 nt | 0.471706 | 0.366927 |
+| 250 nt | 0.018596 | 0.016497 |
+| 500 nt | 0.000600 | 0.002400 |
+
+These values must be retained as a provenance comparison only. The canonical sample-balanced inference is the inferential result used for biological interpretation.
+
+---
+
 ## 05.25 Interpretation rule
 
 The viral analysis may support statements such as:
@@ -3110,7 +3227,9 @@ lag_asymmetry_AS_minus_S
 
 is automatically converted into a per-window vdCHIBIN ranking metric.
 
-If Stage 05 later informs design, the appropriate level is expected to be **regional/construct-level interpretation**, not an intrinsic score assigned independently to each hypothetical 24-nt candidate window.
+For the currently validated dataset, Stage 05 remains **analysis-only**. Its positive `delta_F24_AS` result is a regional population-level spatial observation and is not carried into Stage 06–09 as an intrinsic score assigned independently to each hypothetical 24-nt vdCHIBIN candidate window.
+
+Any later construct-level use would require a separately justified and prospectively documented rule.
 
 ## 05.26 Required outputs
 
@@ -3118,7 +3237,7 @@ If Stage 05 later informs design, the appropriate level is expected to be **regi
 results/05_viral_transitivity/
     coordinate_qc.tsv
     eligible_positive_sense_units.tsv
-    historical_v1.4.1_replication/
+    historical_v1.4.1_replication/   # specification reconstruction; original source/RNG unavailable
         transitivity_by_pair.tsv
         pair_balanced_results.tsv
         virus_balanced_results.tsv
@@ -3168,6 +3287,16 @@ Each run records:
 - input identity/checksums where practical;
 - run date;
 - random seed.
+
+For Stage 05, provenance must additionally record:
+
+```text
+historical_source_package_status
+historical_rng_stream_status
+historical_raw_p_checkpoint_status
+historical_effect_size_regression
+historical_permutation_regression
+```
 
 Relevant software versions include Python, Snakemake, stepRNA, Bowtie2 used by stepRNA, pysam, NumPy, pandas, SciPy, and plotting/statistical packages actually used.
 

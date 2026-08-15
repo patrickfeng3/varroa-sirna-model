@@ -13,6 +13,7 @@ include: "workflow/rules/stage01.smk"
 include: "workflow/rules/stage02.smk"
 include: "workflow/rules/stage03.smk"
 include: "workflow/rules/stage04.smk"
+include: "workflow/rules/stage05.smk"
 
 
 rule all:
@@ -65,3 +66,19 @@ rule all:
         "results/04_duplex_geometry/population/joint_geometry_mode_by_pair.tsv",
         "results/04_duplex_geometry/population/joint_geometry_spectrum_summary.tsv",
         "results/04_duplex_geometry/qc/stage04_joint_geometry_spectrum_accounting.tsv",
+        "results/05_viral_transitivity/coordinate_qc.tsv",
+        "results/05_viral_transitivity/eligible_positive_sense_units.tsv",
+        "results/05_viral_transitivity/historical_v1.4.1_replication/transitivity_by_pair.tsv",
+        "results/05_viral_transitivity/historical_v1.4.1_replication/pair_balanced_results.tsv",
+        "results/05_viral_transitivity/historical_v1.4.1_replication/virus_balanced_results.tsv",
+        "results/05_viral_transitivity/historical_v1.4.1_replication/leave_one_virus_out.tsv",
+        "results/05_viral_transitivity/historical_v1.4.1_replication/cross_correlation.tsv",
+        "results/05_viral_transitivity/historical_v1.4.1_replication/regression_check.tsv",
+        "results/05_viral_transitivity/canonical_transitivity_analysis/transitivity_by_pair.tsv",
+        "results/05_viral_transitivity/canonical_transitivity_analysis/transitivity_by_sample.tsv",
+        "results/05_viral_transitivity/canonical_transitivity_analysis/sample_balanced_results.tsv",
+        "results/05_viral_transitivity/canonical_transitivity_analysis/pair_balanced_sensitivity.tsv",
+        "results/05_viral_transitivity/canonical_transitivity_analysis/virus_balanced_sensitivity.tsv",
+        "results/05_viral_transitivity/canonical_transitivity_analysis/leave_one_virus_out.tsv",
+        "results/05_viral_transitivity/canonical_transitivity_analysis/multiple_testing_summary.tsv",
+        "results/05_viral_transitivity/canonical_transitivity_analysis/final_transitivity_summary.tsv",

@@ -1,6 +1,6 @@
 # Varroa vsiRNA Metric Dictionary
 
-**Version:** 0.9  
+**Version:** 0.10  
 **Scope:** Canonical viral pipeline through viral spatial/transitivity-consistency analysis
 
 ---
@@ -2449,6 +2449,63 @@ lag_asymmetry_AS_minus_S
 
 ---
 
+# 27A. Validated Stage 05 canonical results
+
+Stage 05 is an observational spatial analysis and remains separate from vdCHIBIN per-window ranking.
+
+## `delta_F24_AS` — validated canonical pattern
+
+The canonical sample-balanced analysis found a reproducible positive `delta_F24_AS` at 250–500 nt across both weighting modes and both 23-nt anchor definitions.
+
+Key estimates:
+
+| Weighting | Anchor | Window | Estimate | 95% CI | BH P |
+|---|---|---:|---:|---:|---:|
+| abundance | balanced23 | 250 | +0.006185 | [-0.000957, +0.015907] | 0.037493 |
+| abundance | balanced23 | 500 | +0.016160 | [+0.007511, +0.025209] | 0.007199 |
+| abundance | combined23 | 250 | +0.005753 | [+0.001319, +0.011406] | 0.007199 |
+| abundance | combined23 | 500 | +0.013266 | [+0.006500, +0.019799] | 0.007199 |
+| unique_sequence | balanced23 | 250 | +0.003698 | [+0.002126, +0.006149] | 0.011998 |
+| unique_sequence | balanced23 | 500 | +0.003344 | [+0.000876, +0.006022] | 0.004799 |
+| unique_sequence | combined23 | 250 | +0.001928 | [-0.001638, +0.003904] | 0.010398 |
+| unique_sequence | combined23 | 500 | +0.002153 | [+0.000332, +0.005789] | 0.005999 |
+
+Interpretation:
+
+```text
+positive delta_F24_AS
+=
+downstream antisense 23+24 population is relatively more 24-nt-rich
+```
+
+It does **not** mean that total downstream 24AS abundance increased by the same percentage.
+
+All eight 250/500-nt effects remained positive in leave-one-virus-out sensitivity analysis.
+
+## `antisense_specific_directionality` — validated canonical pattern
+
+No canonical combination supports a positive antisense-specific 24-nt downstream directionality effect after multiple-testing correction:
+
+```text
+BH P = 1.0 for all 12 pre-specified combinations
+```
+
+Therefore Stage 05 supports a **relative compositional shift**, not an absolute antisense-specific downstream 24-nt wave.
+
+## Historical regression provenance
+
+```text
+historical_effect_size_regression = PASS
+historical_permutation_regression = NOT_EXACTLY_REPRODUCED
+historical_source_package_status = unavailable
+historical_rng_stream_status = unavailable
+historical_raw_p_checkpoint_status = unavailable
+```
+
+Historical permutation/BH values are provenance/regression information only. Canonical sample-balanced permutation inference is used for current biological interpretation.
+
+---
+
 # 28. Current biological interpretation
 
 The clean canonical pipeline has established, in sequence:
@@ -2468,7 +2525,7 @@ are highly concordant, with recurring features including
 Stage 03
 official stepRNA reconstructs complementary passengers in all
 four focal classes. Distance 0 is a prominent marginal end-distance,
-especially in antisense populations, but the new same-duplex spectrum
+especially in antisense populations, but the same-duplex spectrum
 shows that fully blunt (0,0) duplexes are only a minority.
 
 The pre-specified (+2,-2) geometry is also a minority same-duplex
@@ -2477,33 +2534,64 @@ especially in antisense populations, while the matching 5p +2
 component is substantially weaker.
 
 Stage 04
-sample-aware aggregation confirms that these findings are broadly
-reproducible across the dataset rather than being explained by one
-outlier sample. Sample-balanced fully blunt (0,0) fractions are
-approximately 2.15% (23S), 9.31% (23AS), 2.27% (24S), and 3.11%
-(24AS), with 0/54 runs in every focal class having >50% (0,0).
+sample-aware aggregation confirms that the geometry observations are
+broadly reproducible across the dataset. Sample-balanced fully blunt
+(0,0) fractions are approximately 2.15% (23S), 9.31% (23AS), 2.27%
+(24S), and 3.11% (24AS), with 0/54 runs in every focal class having
+>50% (0,0).
 
 Sample-balanced (+2,-2) fractions are approximately 1.53% (23S),
 2.00% (23AS), 1.98% (24S), and 0.58% (24AS). In antisense
-populations, (+2,-2) support is reproducibly greater for 23 nt than
-for 24 nt, but this difference is not sufficient to classify the two
-length classes as primary/Dicer versus secondary/RdRP products.
+populations, (+2,-2) support is greater for 23 nt than for 24 nt,
+but this is not sufficient to classify the two length classes as
+primary/Dicer versus secondary/RdRP products.
 
-Geometry-conditioned terminal sequence effects exist, but are not
-consistently strong across abundance and unique-sequence weighting
-and partly overlap the general Stage 02 terminal-enrichment landscape.
-A separate geometry/Dicer ranking feature is therefore not carried
-forward into vdCHIBIN candidate ranking.
+Geometry-conditioned terminal sequence effects are not consistently
+strong across abundance and unique-sequence weighting and partly
+overlap the Stage 02 terminal-enrichment landscape. A separate
+geometry/Dicer ranking feature is therefore not carried forward.
+
+Stage 05
+14 samples and 19 eligible positive-sense sample-virus units across
+BMLV, VDV-5, and VDV-9 were analysed spatially.
+
+At 250–500 nt downstream of predefined 23-nt hotspots,
+delta_F24_AS is reproducibly positive across abundance/unique
+weighting and balanced/combined anchor definitions. All eight
+pre-specified 250/500-nt combinations are BH-significant in the
+canonical spatial permutation analysis, and all remain positive
+when any one virus is left out.
+
+This means the downstream antisense 23+24 population is modestly
+more 24-nt-rich in composition.
+
+In contrast, antisense_specific_directionality has no positive
+BH-significant result (BH P = 1.0 for all 12 combinations).
+Therefore Stage 05 does not show an absolute antisense-specific
+downstream wave of 24-nt signal.
+
+The combined result is consistent with a spatial
+amplification/transitivity-associated pattern, but does not prove
+a 23→24 precursor-product relationship, RdRP-dependent secondary
+siRNA production, or Dicer-versus-RdRP pathway assignment.
 ```
 
 Therefore the canonical project must **not currently describe 23 nt as proven primary/Dicer products or 24 nt as proven secondary/RdRP products**.
 
-The joint-geometry result also requires a strict distinction between:
+The pipeline must also preserve these distinctions:
 
 ```text
 marginal distance 0
     ≠
 fully blunt same-duplex (0,0)
+
+positive delta_F24_AS
+    ≠
+absolute increase in downstream 24AS abundance
+
+spatial 23→24 association
+    ≠
+proof of biochemical precursor→product order
 ```
 
 The pipeline must never simplify the evidence to:
@@ -2513,15 +2601,15 @@ all 23-mers = Dicer/primary
 all 24-mers = secondary/RdRP
 24-mers = Dicer-independent
 marginal distance 0 = fully blunt duplex
-blunt geometry = non-Dicer
 (+2,-2) = a universal Dicer definition
-the current geometry distribution is sufficient to classify Dicer vs RdRP origin
-geometry-conditioned sequence preference = an independent ranking score
+positive Stage 05 = proven RdRP transitivity
+500 nt = a universal biological propagation distance
+Stage 05 spatial effect = intrinsic vdCHIBIN window score
 ```
 
-Natural viral infection creates structured complementary RNA substrates, while passenger stability, post-cleavage processing, library preparation, and sequence recoverability can alter the sequenced population. stepRNA reconstructs compatible focal/passenger relationships from independently sequenced RNAs; it does not directly observe the original physical cleavage event.
+Natural viral infection creates structured complementary RNA substrates, and viral replication, subgenomic transcription, RNA stability, library preparation, passenger recovery, and local sequence/mappability can all contribute to the observed population.
 
-Stage 05 is the next analysis stage and may add independent evidence about 23/24 viral spatial relationships consistent with amplification/transitivity-associated biology. It is observational and analysis-only: it must not retroactively turn Stage 03/04 geometry into a pathway assignment, assume 23 nt is primary/Dicer-derived, assume 24 nt is secondary/RdRP-derived, or automatically create a candidate-ranking metric.
+Stages 03–05 therefore provide biological/pathway context while remaining deliberately separate from per-window vdCHIBIN ranking.
 
 ---
 
