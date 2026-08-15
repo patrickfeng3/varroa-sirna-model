@@ -1,6 +1,6 @@
 # Varroa vsiRNA Metric Dictionary
 
-**Version:** 0.12  
+**Version:** 0.13  
 **Scope:** Canonical viral pipeline through viral spatial/transitivity-consistency analysis
 
 ---
@@ -2611,84 +2611,69 @@ Natural viral infection creates structured complementary RNA substrates, and vir
 
 Stages 03–05 therefore provide biological/pathway context while remaining deliberately separate from per-window vdCHIBIN ranking.
 
-Stage 06 begins the design-facing pipeline by locking XM_022792159.1 and enumerating all 688 complete 23-nt intervals and all 687 complete 24-nt intervals (1,375 total), with exact sense-target and antisense-guide orientation. The two lengths remain parallel analysis strata. Stage 06 is sequence/coordinate preparation only and introduces no efficacy ranking.
+Stage 06 begins the design-facing pipeline with a generic transcript registry and target-agnostic exhaustive candidate enumerator. Vd-CHIBIN / XM_022792159.1 is the first validated regression fixture (688 23-nt + 687 24-nt candidates), not a hard-coded algorithmic special case. Adding another mature transcript should normally require only a FASTA, optional transcript-coordinate annotation, and a target-manifest row—no Python code change.
 
 ---
 
 
-# 29. Stage 06 Vd-CHIBIN target/candidate definitions
+# 29. Stage 06 generic transcript/candidate definitions
 
-Stage 06 metrics are coordinate/identity definitions, not efficacy scores.
+Stage 06 definitions are target-agnostic coordinate/identity definitions, not efficacy scores.
 
-## `candidate_id`
+## `target_id`
 
-**Class:** Canonical identifier
+**Class:** Canonical project identifier
 
-```text
-XM_022792159.1__LENGTHnt__START_END
-```
+Unique project-stable identifier for one transcript target.
 
-with zero-padded 1-based inclusive coordinates.
+The Stage 06 engine uses this identifier in candidate IDs and must not assume that gene symbols are globally unique.
 
-Examples:
+## `transcript_id`
 
-```text
-XM_022792159.1__23nt__0001_0023
-XM_022792159.1__24nt__0001_0024
-```
+**Class:** Canonical sequence identifier
 
-A repeated sequence at a different coordinate or at a different candidate length receives a different candidate ID.
+Identifier of the exact mature/spliced transcript sequence.
+
+External accession-version identifiers should retain their version when available.
+
+Each transcript isoform is a separate target.
 
 ## `candidate_length_nt`
 
-**Class:** Canonical project parameter
+**Class:** Canonical per-target parameter
 
-Allowed values:
+Positive integer requested in the target manifest.
+
+The generic engine must not hard-code 23 or 24.
+
+Current Vd-CHIBIN values are:
 
 ```text
 23
 24
 ```
 
-The two lengths are parallel Stage 06 analysis strata.
-
-They are design lengths, not pathway labels:
-
-```text
-23 nt ≠ automatically primary/Dicer
-24 nt ≠ automatically secondary/RdRP
-```
+These are design lengths, not pathway labels.
 
 ## `start_1based`
 
-**Class:** Canonical coordinate
+**Class:** Canonical transcript coordinate
 
-First nucleotide of the target interval on the Vd-CHIBIN mRNA, using 1-based inclusive coordinates.
-
-Allowed canonical ranges:
-
-```text
-23 nt: 1–688
-24 nt: 1–687
-```
+First nucleotide of the candidate interval in the supplied mature transcript, using 1-based inclusive coordinates.
 
 ## `end_1based`
 
-**Class:** Canonical coordinate
+**Class:** Canonical transcript coordinate
 
 ```text
 end_1based = start_1based + candidate_length_nt - 1
 ```
 
-Every candidate ends at or before transcript coordinate 710.
-
 ## `target_sequence_dna`
 
 **Class:** Canonical sequence identity
 
-Exact uppercase sense/transcript slice from the locked XM_022792159.1 sequence, represented with DNA alphabet `A/C/G/T`.
-
-Length must equal `candidate_length_nt`.
+Exact uppercase transcript/sense slice normalized to DNA alphabet `A/C/G/T`.
 
 ## `target_sequence_rna`
 
@@ -2699,7 +2684,7 @@ target_sequence_rna
     = target_sequence_dna with T→U
 ```
 
-represented 5′→3′ in the Vd-CHIBIN mRNA/sense orientation.
+represented 5′→3′ in transcript orientation.
 
 ## `antisense_guide_sequence_rna`
 
@@ -2712,133 +2697,113 @@ antisense_guide_sequence_rna
 
 represented 5′→3′.
 
-Important:
+The guide rule applies to every transcript target independent of genomic strand.
+
+## `annotation_status`
+
+**Class:** Canonical provenance/annotation state
+
+Allowed values include:
 
 ```text
-guide 5′ end ↔ complement of target interval 3′ end
-guide 3′ end ↔ complement of target interval 5′ end
+available
+partial
+unavailable
 ```
-
-This rule applies identically to 23-nt and 24-nt candidates.
 
 ## `start_region`
 
-**Class:** Canonical annotation
+**Class:** Optional transcript-region annotation
 
-Transcript annotation containing `start_1based`.
+Region label covering the candidate start coordinate.
 
-Allowed values:
+If annotation exists but the coordinate is uncovered:
 
 ```text
-5_prime_UTR
-CDS
-3_prime_UTR
+unannotated
 ```
 
-This is a grouping label only.
+If annotation is unavailable:
+
+```text
+NA
+```
+
+No specific region vocabulary is required by the generic engine.
 
 ## `end_region`
 
-**Class:** Canonical annotation
+**Class:** Optional transcript-region annotation
 
-Transcript annotation containing `end_1based`.
+Region label covering the candidate end coordinate, with the same `unannotated`/`NA` rules.
 
 ## `overlap_regions`
 
-**Class:** Canonical annotation
+**Class:** Optional transcript-region annotation
 
-Ordered semicolon-separated set of transcript regions touched by the complete candidate interval.
-
-Examples:
-
-```text
-5_prime_UTR
-5_prime_UTR;CDS
-CDS
-CDS;3_prime_UTR
-3_prime_UTR
-```
+Ordered semicolon-separated region/unannotated segments touched by the complete candidate interval.
 
 ## `crosses_annotation_boundary`
 
-**Class:** Canonical boolean annotation
+**Class:** Optional boolean annotation
+
+When annotation is available:
 
 ```text
-TRUE  if start_region != end_region
+TRUE  if the complete candidate spans >1 region/unannotated segment
 FALSE otherwise
 ```
 
-Cross-boundary candidates remain valid candidate intervals.
-
-## Canonical Stage 06 counts
-
-### 23 nt
+When annotation is unavailable:
 
 ```text
-total candidates = 688
-
-start_region:
-5_prime_UTR = 329
-CDS         = 336
-3_prime_UTR = 23
-
-fully within one region:
-5_prime_UTR = 307
-CDS         = 314
-3_prime_UTR = 23
-
-cross-boundary:
-5_prime_UTR→CDS = 22
-CDS→3_prime_UTR = 22
-total            = 44
+NA
 ```
 
-### 24 nt
+## `expected_candidate_count(L,w)`
+
+**Class:** Canonical deterministic accounting metric
+
+For transcript length `L` and candidate length `w`:
 
 ```text
-total candidates = 687
-
-start_region:
-5_prime_UTR = 329
-CDS         = 336
-3_prime_UTR = 22
-
-fully within one region:
-5_prime_UTR = 306
-CDS         = 313
-3_prime_UTR = 22
-
-cross-boundary:
-5_prime_UTR→CDS = 23
-CDS→3_prime_UTR = 23
-total            = 46
+expected_candidate_count = L - w + 1
 ```
 
-### Combined
+provided `1 ≤ w ≤ L`.
+
+## Current Vd-CHIBIN regression fixture
 
 ```text
-total Stage 06 candidates = 1,375
+target_id     = Vd_CHIBIN
+transcript_id = XM_022792159.1
+L             = 710
+
+w=23 → 688 candidates
+w=24 → 687 candidates
+total → 1,375
 ```
 
-These are deterministic accounting checks rather than biological metrics.
+These values validate the current target fixture only and are not generic algorithm constants.
 
-## Parallel-length carry-forward rule
+## Generic carry-forward rule
 
-Stage 07 and later candidate-level analyses should preserve:
+All later candidate-level analyses must preserve:
 
 ```text
+target_id
+transcript_id
 candidate_length_nt
+candidate_id
 ```
 
-as an explicit stratum.
+so results from different genes, transcript isoforms, organisms, and candidate lengths cannot be silently mixed.
 
-Within-length ranking and between-length comparison are different analytical operations.
-
-A metric may be compared directly between 23 nt and 24 nt only if its definition and normalization support such a comparison.
+Within-target/within-length ranking and between-target/between-length comparison are distinct analytical operations.
 
 ## Stage 06 non-metrics
 
-The following are intentionally **not** defined in Stage 06:
+Stage 06 does not define:
 
 ```text
 accessibility score

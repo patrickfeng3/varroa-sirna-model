@@ -1,6 +1,6 @@
 # Canonical Varroa vsiRNA Pipeline Specification
 
-**Specification version:** 0.12  
+**Specification version:** 0.13  
 **Status:** Stages 00–05 implemented and validated; Stage 06 scientifically specified before implementation  
 **Scope:** Viral small-RNA analysis through viral spatial/transitivity-consistency analysis  
 **Host transitivity:** Excluded  
@@ -3258,182 +3258,298 @@ results/05_viral_transitivity/
 
 ---
 
-# 06 — Vd-CHIBIN target preparation and exhaustive 23/24-nt candidate enumeration
+# 06 — Generic transcript target preparation and exhaustive candidate enumeration
 
 ## 06.1 Purpose
 
-Stage 06 establishes the **canonical vdCHIBIN candidate universe** before any accessibility, thermodynamic, empirical-enrichment, ranking, or construct-level scoring is applied.
+Stage 06 is the first design-facing stage. Its implementation must be **target-agnostic**.
 
-It answers only:
+The core Stage 06 engine must work for any supplied mature/spliced mRNA transcript sequence, not only Vd-CHIBIN.
 
-> What exact 23-nt and 24-nt target intervals exist in the locked Vd-CHIBIN transcript, what sequences do they contain, what is the corresponding antisense guide orientation, and which transcript annotations do they overlap?
+Vd-CHIBIN / `XM_022792159.1` is the **first validated target instance and regression fixture**, not a hard-coded special case.
 
-Stage 06 is deliberately sequence/coordinate preparation only.
+Stage 06 answers only:
 
-It does **not**:
+> For each registered transcript target and requested candidate length, what complete target intervals exist, what is the exact sense/mRNA sequence, what is the corresponding 5′→3′ antisense guide sequence, and what optional transcript-coordinate annotation does each interval overlap?
+
+Stage 06 does **not**:
 
 - run ViennaRNA;
-- calculate strand asymmetry;
-- join Stage 02 enrichment values;
+- calculate thermodynamic asymmetry;
+- join Stage 02 empirical terminal enrichment;
 - use Stage 03/04 duplex geometry;
 - use Stage 05 transitivity;
-- apply an asymmetry gate;
-- calculate A/T/N/S;
 - rank candidates;
+- assign candidates to Dicer/RdRP pathways;
 - select positive or negative controls;
-- compare 23-nt and 24-nt candidates by a single aggregate score;
-- compare 24/48/96 constructs.
+- compare constructs.
 
 ---
 
-## 06.2 Locked target reference
+## 06.2 Biological coordinate object: the mature transcript
 
-Canonical target:
+The computational target is a **transcript sequence**, not a genomic DNA interval.
 
-```text
-project target: Vd-CHIBIN / vbchitin
-RefSeq accession-version: XM_022792159.1
-transcript length: 710 nt
-```
+For eukaryotic targets, use the mature/spliced transcript sequence in 5′→3′ orientation. Introns are therefore absent from the Stage 06 coordinate system.
 
-Canonical transcript annotation:
+Each transcript isoform is a separate target because alternative splicing changes transcript sequence and transcript-coordinate positions.
 
-```text
-5′ UTR: 1–329
-CDS:    330–665
-3′ UTR: 666–710
-```
+The generic Stage 06 engine must not infer transcript sequence by concatenating genomic coordinates during routine candidate enumeration. If a genomic annotation is the original source, transcript extraction/validation belongs in a separate reference-preparation step.
 
-All coordinates are **1-based inclusive**.
-
-The canonical tracked reference bundle is:
-
-```text
-resources/vdchibin/XM_022792159.1.fasta
-resources/vdchibin/XM_022792159.1.annotation.tsv
-resources/vdchibin/XM_022792159.1.reference_manifest.tsv
-```
-
-The normalized uppercase DNA sequence must be exactly 710 nt, contain only `A/C/G/T`, and have:
-
-```text
-SHA-256 = 4a0d25aa05b269a118ed1b952dca63ccd1c0a7978fc42295faf3bf650e43ea42
-```
-
-where the hash is calculated over the 710 uppercase sequence characters only, with no FASTA header or newline characters.
-
-The small tracked reference bundle is the canonical computational input. A live database fetch may be used only as an explicit reference-validation step; Stage 06 must not silently replace the locked accession-version sequence during routine analysis.
-
-Historical custom Panel-B annotations are not part of the canonical Stage 06 annotation set.
+This separation prevents genomic strand, exon order, introns, and alternative isoforms from silently contaminating the candidate-coordinate system.
 
 ---
 
-## 06.3 Parallel candidate lengths
+## 06.3 Canonical target registry
 
-Canonical Stage 06 candidate lengths are:
-
-```text
-23 nt
-24 nt
-```
-
-Both lengths are enumerated from the **same locked transcript**, using the same coordinate system, annotation rules, and guide-orientation rules.
-
-This parallel treatment is important because Stages 01–05 established that both 23-nt and 24-nt viral small-RNA populations are biologically prominent while **not** establishing that one length uniquely represents primary/Dicer processing and the other uniquely represents secondary/RdRP processing.
-
-Therefore:
+The canonical Stage 06 input is a tracked manifest:
 
 ```text
-23 nt ≠ automatically “primary”
-24 nt ≠ automatically “secondary”
+resources/targets/target_manifest.tsv
 ```
 
-The two candidate universes remain separate analysis strata through later stages unless a future specification explicitly defines a justified cross-length comparison.
+One row represents one transcript target.
 
-Stage 06 does not prefer either length.
+Required columns:
+
+```text
+target_id
+transcript_id
+display_name
+organism
+molecule_type
+fasta_path
+fasta_record_id
+annotation_path
+expected_length_nt
+sequence_sha256_uppercase_dna
+candidate_lengths_nt
+source_database
+source_accession_version
+```
+
+### `target_id`
+
+Project-stable, filesystem-safe identifier used in candidate IDs.
+
+It must be unique within the manifest and must not be inferred from gene symbol alone.
+
+### `transcript_id`
+
+Identifier for the exact transcript sequence.
+
+Where an external accession is used, preserve the accession **with version** whenever one exists.
+
+Examples may include:
+
+```text
+NM_...
+XM_...
+ENST...
+user-defined transcript ID
+synthetic transcript ID
+```
+
+The engine must not require a RefSeq prefix.
+
+### `fasta_path` and `fasta_record_id`
+
+The FASTA may be a single-record or multi-record file.
+
+`fasta_record_id` identifies the exact record to use.
+
+The normalized sequence must be interpreted as the transcript 5′→3′ sequence.
+
+### `sequence_sha256_uppercase_dna`
+
+SHA-256 is calculated over the normalized uppercase `A/C/G/T` sequence characters only, excluding FASTA headers and whitespace.
+
+The hash locks the exact transcript sequence independently of filename.
+
+### `candidate_lengths_nt`
+
+Comma-separated positive integers, for example:
+
+```text
+23,24
+```
+
+The generic engine must enumerate whatever lengths are listed for that target.
+
+The current Vd-CHIBIN project instance uses `23,24`, but the Stage 06 code must not hard-code those values.
+
+### `annotation_path`
+
+Optional transcript-coordinate region annotation.
+
+Use:
+
+```text
+NA
+```
+
+if no region annotation is available.
+
+Candidate enumeration must still work when annotation is unavailable.
+
+### Source fields
+
+`source_database` and `source_accession_version` are provenance fields.
+
+They may be `NA` for user-defined, de novo assembled, or synthetic transcript targets.
 
 ---
 
-## 06.4 Exhaustive window enumeration
+## 06.4 Generic transcript-coordinate annotation
 
-For transcript length:
+Stage 06 uses a simple transcript-coordinate annotation table rather than parsing arbitrary genomic GFF3 directly.
+
+If present, the annotation TSV must contain:
 
 ```text
-L = 710
+transcript_id
+region_label
+start_1based
+end_1based
+coordinate_system
 ```
 
-and candidate length `w`, enumerate every complete interval with:
+Coordinates are:
+
+```text
+1-based inclusive transcript coordinates
+```
+
+`region_label` is not restricted to Vd-CHIBIN-specific labels.
+
+Common protein-coding mRNA labels may include:
+
+```text
+5_prime_UTR
+CDS
+3_prime_UTR
+```
+
+but user-defined labels are allowed.
+
+The core enumerator must **not assume that all transcripts contain all three labels**.
+
+Annotation may be:
+
+- complete;
+- partial;
+- absent.
+
+For the canonical simple-region table, annotated intervals for one transcript must be ordered and non-overlapping.
+
+Gaps are permitted and are treated as `unannotated`.
+
+If the annotation file is `NA`, annotation-derived candidate fields are `NA`.
+
+This design allows the same engine to handle:
+
+- complete RefSeq/GenBank/Ensembl mRNAs;
+- predicted transcripts;
+- partial transcripts;
+- alternative isoforms;
+- de novo assembled transcripts;
+- synthetic mRNAs/cDNAs.
+
+---
+
+## 06.5 Generic validation
+
+For every target row:
+
+1. locate the FASTA record identified by `fasta_record_id`;
+2. remove whitespace and normalize nucleotide case;
+3. permit DNA `T` or RNA `U` input, but normalize internally to uppercase DNA alphabet `A/C/G/T`;
+4. reject sequences containing unresolved non-ACGT characters unless a future specification explicitly defines ambiguity handling;
+5. verify `expected_length_nt`;
+6. verify `sequence_sha256_uppercase_dna`;
+7. verify all requested candidate lengths are positive integers and do not exceed transcript length;
+8. if annotation is present, verify:
+   - matching `transcript_id`;
+   - coordinates lie within 1..transcript length;
+   - start ≤ end;
+   - rows are ordered/non-overlapping after sorting;
+   - no duplicate region interval rows.
+
+A sequence/hash mismatch is a FAIL.
+
+The core code must not contain:
+
+```text
+XM_022792159.1
+710
+Vd-CHIBIN
+330
+665
+```
+
+as algorithmic constants.
+
+Those values belong only to the current target registry/reference fixture and target-specific regression tests.
+
+---
+
+## 06.6 Exhaustive generic candidate enumeration
+
+For a transcript of length `L` and requested candidate length `w`:
 
 ```text
 start_1based = 1 ... L - w + 1
 end_1based   = start_1based + w - 1
+n_candidates = L - w + 1
 ```
 
-### 23 nt
+Every complete interval is retained.
 
-```text
-n_candidates_23 = 710 - 23 + 1 = 688
-```
+No accessibility, sequence-composition, thermodynamic, empirical, geometry, or transitivity filter is applied.
 
-### 24 nt
+For a target requesting multiple lengths, enumerate each length independently.
 
-```text
-n_candidates_24 = 710 - 24 + 1 = 687
-```
-
-Total Stage 06 candidate rows:
-
-```text
-688 + 687 = 1,375
-```
-
-No candidate may extend beyond either transcript end.
-
-No spacing, accessibility, sequence-composition, empirical-enrichment, geometry, or transitivity filter is applied at this stage.
-
-Enumeration must be deterministic and exhaustive within each length.
+For multiple target-manifest rows, enumerate each target independently and concatenate the resulting rows into the canonical Stage 06 table.
 
 ---
 
-## 06.5 Canonical candidate identifier
+## 06.7 Generic candidate identifier
 
-Each candidate receives a deterministic identifier:
+Candidate identifier:
 
 ```text
-XM_022792159.1__LENGTHnt__START_END
+TARGET_ID__LENGTHnt__START_END
 ```
 
-with zero-padded 1-based inclusive coordinates.
+with zero-padded transcript coordinates.
 
-Examples:
+Examples for the current target:
 
 ```text
-XM_022792159.1__23nt__0001_0023
-XM_022792159.1__23nt__0688_0710
-
-XM_022792159.1__24nt__0001_0024
-XM_022792159.1__24nt__0687_0710
+Vd_CHIBIN__23nt__0001_0023
+Vd_CHIBIN__24nt__0001_0024
 ```
 
 Candidate identity is defined by:
 
 ```text
-accession-version
+target_id
+transcript_id
 candidate length
-target interval coordinates
+transcript coordinates
 ```
 
-Sequence identity alone is not sufficient because repeated sequences at different transcript positions remain distinct target intervals.
+Sequence identity alone is not sufficient because identical k-mers may occur at multiple positions or targets.
 
 ---
 
-## 06.6 Sequence orientation
+## 06.8 Sequence orientation
 
-For each candidate interval:
+For every candidate:
 
 ```text
 target_sequence_dna
-    = exact transcript/sense sequence, 5′→3′, DNA alphabet
+    = exact mature-transcript/sense slice, 5′→3′
 
 target_sequence_rna
     = target_sequence_dna with T→U, 5′→3′
@@ -3442,299 +3558,235 @@ antisense_guide_sequence_rna
     = reverse complement of target_sequence_rna, 5′→3′
 ```
 
-The desired guide orientation for later RNAi design is:
+The generic guide rule is:
+
+> the guide sequence is antisense to the supplied target transcript.
+
+Therefore:
 
 ```text
-antisense to the Vd-CHIBIN mRNA
+guide 5′ nt ↔ complement of target interval final nt
+guide 3′ nt ↔ complement of target interval first nt
 ```
 
-The guide 5′ end therefore corresponds to the **target interval's 3′ end**, not its 5′ start coordinate.
+This orientation rule is independent of the transcript's genomic strand because Stage 06 operates in transcript coordinates on the supplied 5′→3′ mRNA sequence.
 
-Stage 06 must test this explicitly for both 23-nt and 24-nt candidates.
-
-Do not reverse-complement the target before Stage 07 target-accessibility analysis; accessibility is evaluated on the mRNA/sense target interval.
+Target accessibility in Stage 07 must use the target/sense transcript orientation, not the reverse complement.
 
 ---
 
-## 06.7 Transcript-region annotation
+## 06.9 Generic annotation of candidates
 
-Stage 06 records both **start-region grouping** and **actual interval overlap** so that the two concepts cannot be confused later.
-
-For each candidate define:
+Required output fields:
 
 ```text
 start_region
 end_region
 overlap_regions
 crosses_annotation_boundary
+annotation_status
 ```
 
-`start_region` is the annotation containing `start_1based`.
+### If annotation is complete or partial
 
-`end_region` is the annotation containing `end_1based`.
+`start_region` and `end_region` contain the region label covering the relevant coordinate.
 
-`overlap_regions` is the ordered semicolon-separated list of all transcript annotations intersected by the full candidate interval.
-
-Cross-boundary candidates remain valid Stage 06 candidates. They are **annotated, not discarded**.
-
-Examples:
+If the coordinate is not covered by any annotation row:
 
 ```text
-23 nt candidate 308–330
-start_region = 5_prime_UTR
-end_region   = CDS
-overlap_regions = 5_prime_UTR;CDS
-crosses_annotation_boundary = TRUE
+unannotated
 ```
+
+`overlap_regions` is the ordered semicolon-separated list of all region labels and any unannotated segment touched by the candidate.
+
+`crosses_annotation_boundary = TRUE` when the candidate spans more than one region/unannotated segment.
+
+### If annotation is unavailable
+
+Use:
 
 ```text
-24 nt candidate 307–330
-start_region = 5_prime_UTR
-end_region   = CDS
-overlap_regions = 5_prime_UTR;CDS
-crosses_annotation_boundary = TRUE
+annotation_status = unavailable
+start_region = NA
+end_region = NA
+overlap_regions = NA
+crosses_annotation_boundary = NA
 ```
 
-```text
-23 nt candidate 666–688
-start_region = 3_prime_UTR
-end_region   = 3_prime_UTR
-overlap_regions = 3_prime_UTR
-crosses_annotation_boundary = FALSE
-```
+Candidate enumeration remains valid.
 
-```text
-24 nt candidate 666–689
-start_region = 3_prime_UTR
-end_region   = 3_prime_UTR
-overlap_regions = 3_prime_UTR
-crosses_annotation_boundary = FALSE
-```
-
-Any later region-specific selection rule must state explicitly whether it uses start-region grouping, complete containment, or overlap.
+The Stage 06 engine must not discard a candidate because it crosses a region boundary or lacks annotation.
 
 ---
 
-## 06.8 Expected deterministic counts
+## 06.10 Canonical output schema
 
-### 23-nt candidates
-
-Total:
+Primary output:
 
 ```text
-688
-```
-
-By start coordinate region:
-
-```text
-5_prime_UTR starts = 329
-CDS starts         = 336
-3_prime_UTR starts = 23
-total              = 688
-```
-
-Fully contained within one annotation:
-
-```text
-5_prime_UTR only = 307
-CDS only         = 314
-3_prime_UTR only = 23
-total fully within one region = 644
-```
-
-Cross-boundary:
-
-```text
-5_prime_UTR → CDS = 22
-CDS → 3_prime_UTR = 22
-total cross-boundary = 44
-```
-
-### 24-nt candidates
-
-Total:
-
-```text
-687
-```
-
-By start coordinate region:
-
-```text
-5_prime_UTR starts = 329
-CDS starts         = 336
-3_prime_UTR starts = 22
-total              = 687
-```
-
-Fully contained within one annotation:
-
-```text
-5_prime_UTR only = 306
-CDS only         = 313
-3_prime_UTR only = 22
-total fully within one region = 641
-```
-
-Cross-boundary:
-
-```text
-5_prime_UTR → CDS = 23
-CDS → 3_prime_UTR = 23
-total cross-boundary = 46
-```
-
-### Combined accounting
-
-```text
-23-nt candidates = 688
-24-nt candidates = 687
-total rows        = 1,375
-```
-
-These counts are deterministic QC expectations, not biological filters.
-
----
-
-## 06.9 Canonical output schema
-
-Primary candidate table:
-
-```text
-results/06_vdchibin_candidates/vdchibin_candidates.tsv
+results/06_targets/target_candidates.tsv
 ```
 
 Required columns:
 
 ```text
+target_id
+transcript_id
+display_name
+organism
 candidate_id
-accession
 candidate_length_nt
 start_1based
 end_1based
 target_sequence_dna
 target_sequence_rna
 antisense_guide_sequence_rna
+annotation_status
 start_region
 end_region
 overlap_regions
 crosses_annotation_boundary
 ```
 
-The primary table contains **both** 23-nt and 24-nt candidates.
+Optional exact filtered exports may be produced per target or per length, but the combined table is the source of truth.
 
-Optional convenience exports may be generated:
-
-```text
-vdchibin_23nt_candidates.tsv
-vdchibin_24nt_candidates.tsv
-```
-
-but they must be exact filtered views of the canonical combined table and must not become separate sources of truth.
-
-Optional implementation/provenance columns may be added only if they do not alter candidate identity or silently introduce ranking features.
-
-Do **not** add columns called:
-
-```text
-score
-rank
-primary_score
-secondary_score
-Dicer_score
-transitivity_score
-```
-
-in Stage 06.
+Do not add ranking columns in Stage 06.
 
 ---
 
-## 06.10 QC and deterministic tests
+## 06.11 Generic QC
 
-Stage 06 must verify at least:
+For every target × candidate-length stratum verify:
 
-### Reference
+```text
+observed candidate count = L - w + 1
+```
 
-- exact accession-version string;
-- sequence length = 710;
-- uppercase normalized sequence contains only A/C/G/T;
-- sequence SHA-256 matches the locked manifest;
-- annotation intervals are contiguous, non-overlapping, ordered, and cover exactly 1–710;
-- CDS = 330–665;
-- UTR boundaries match the locked annotation.
+Also verify:
 
-### Enumeration — 23 nt
+- first interval = `1..w`;
+- last interval = `(L-w+1)..L`;
+- every interval has length `w`;
+- every legal start occurs exactly once;
+- no illegal start occurs;
+- candidate IDs are globally unique;
+- target sequence equals the exact transcript slice;
+- RNA conversion is exact;
+- antisense guide is the exact reverse complement;
+- no candidate is filtered.
 
-- exactly 688 candidates;
-- first interval = 1–23;
-- final interval = 688–710;
-- every interval length = 23;
-- starts increase by exactly 1;
-- no duplicate candidate IDs;
-- no missing start coordinate from 1–688;
-- target sequence equals exact transcript slice.
+Across the complete output verify:
 
-### Enumeration — 24 nt
+```text
+total observed rows
+=
+Σtargets Σlengths (L - w + 1)
+```
 
-- exactly 687 candidates;
-- first interval = 1–24;
-- final interval = 687–710;
-- every interval length = 24;
-- starts increase by exactly 1;
-- no duplicate candidate IDs;
-- no missing start coordinate from 1–687;
-- target sequence equals exact transcript slice.
-
-### Combined table
-
-- exactly 1,375 rows;
-- candidate lengths are exactly `{23,24}`;
-- exactly 688 rows have length 23;
-- exactly 687 rows have length 24;
-- no duplicate candidate IDs across the combined table.
-
-### Orientation
-
-For both lengths:
-
-- `target_sequence_rna = target_sequence_dna.replace(T,U)`;
-- antisense guide equals exact reverse complement of target RNA;
-- guide length equals `candidate_length_nt`;
-- guide 5′ nucleotide is complementary to the target interval's final nucleotide;
-- guide 3′ nucleotide is complementary to the target interval's first nucleotide.
-
-### Annotation — 23 nt
-
-- start-region counts = 329 / 336 / 23;
-- fully-contained counts = 307 / 314 / 23;
-- exactly 44 cross-boundary candidates;
-- 308–330 is labelled `5_prime_UTR;CDS`;
-- 644–666 is labelled `CDS;3_prime_UTR`;
-- 666–688 is fully `3_prime_UTR`.
-
-### Annotation — 24 nt
-
-- start-region counts = 329 / 336 / 22;
-- fully-contained counts = 306 / 313 / 22;
-- exactly 46 cross-boundary candidates;
-- 307–330 is labelled `5_prime_UTR;CDS`;
-- 643–666 is labelled `CDS;3_prime_UTR`;
-- 666–689 is fully `3_prime_UTR`.
-
-Any mismatch in reference identity, sequence hash, enumeration, or orientation is a **FAIL**.
+Target-specific annotation counts may be tested as **regression fixtures**, not generic algorithm assumptions.
 
 ---
 
-## 06.11 Outputs
+## 06.12 Current Vd-CHIBIN regression fixture
+
+The current first target instance is:
 
 ```text
-results/06_vdchibin_candidates/
+target_id      = Vd_CHIBIN
+transcript_id  = XM_022792159.1
+display_name   = Vd-CHIBIN
+organism       = Varroa destructor
+molecule_type  = mRNA
+length         = 710
+candidate lengths = 23,24
+```
+
+Locked SHA-256:
+
+```text
+4a0d25aa05b269a118ed1b952dca63ccd1c0a7978fc42295faf3bf650e43ea42
+```
+
+Transcript-coordinate annotation:
+
+```text
+5_prime_UTR  1–329
+CDS          330–665
+3_prime_UTR  666–710
+```
+
+Expected Vd-CHIBIN enumeration:
+
+```text
+23 nt = 688 candidates
+24 nt = 687 candidates
+combined = 1,375
+```
+
+Expected Vd-CHIBIN boundary counts:
+
+```text
+23 nt:
+5_prime_UTR→CDS = 22
+CDS→3_prime_UTR = 22
+
+24 nt:
+5_prime_UTR→CDS = 23
+CDS→3_prime_UTR = 23
+```
+
+These values validate the current target fixture only.
+
+They must not appear as generic Stage 06 algorithmic constants.
+
+---
+
+## 06.13 Generic software architecture requirement
+
+The Stage 06 Python implementation should expose target-agnostic functions such as:
+
+```text
+load_target_manifest(...)
+load_transcript_sequence(...)
+load_transcript_regions(...)
+validate_target(...)
+enumerate_candidates(...)
+annotate_candidate(...)
+reverse_complement_rna(...)
+```
+
+The command-line entry point should accept at minimum:
+
+```text
+--target-manifest
+--output-root
+```
+
+The core enumerator must not import project-specific Vd-CHIBIN constants.
+
+Vd-CHIBIN-specific expected values belong in test fixtures or target metadata.
+
+This separation is required so that adding another mRNA normally means:
+
+1. add/register its transcript FASTA;
+2. optionally add its transcript-coordinate annotation;
+3. add one row to `target_manifest.tsv`;
+4. rerun Stage 06.
+
+No Python code change should normally be required.
+
+---
+
+## 06.14 Outputs
+
+```text
+resources/targets/
+└── target_manifest.tsv
+
+results/06_targets/
 │
-├── vdchibin_reference_summary.tsv
-├── vdchibin_candidates.tsv
-├── vdchibin_23nt_candidates.tsv          # optional exact filtered view
-├── vdchibin_24nt_candidates.tsv          # optional exact filtered view
+├── target_reference_summary.tsv
+├── target_candidates.tsv
 │
 ├── qc/
 │   └── stage06_accounting.tsv
@@ -3749,31 +3801,25 @@ No upstream viral analysis is rerun.
 
 ---
 
-## 06.12 Interpretation and carry-forward
+## 06.15 Interpretation and carry-forward
 
-A Stage 06 row means only:
+A Stage 06 candidate row means only:
 
-> this exact 23-nt or 24-nt interval exists in the locked Vd-CHIBIN transcript and has this exact antisense guide sequence and annotation context.
+> this exact interval exists in this exact locked transcript sequence and has this exact antisense guide sequence and annotation context.
 
-It does **not** mean that the candidate is efficient, accessible, favourably asymmetric, enriched, Dicer-compatible, transitivity-compatible, or selected.
+It does not imply efficacy or mechanism.
 
-All 1,375 candidates proceed equally into Stage 07 unless a future explicit sequence-integrity exclusion is added prospectively.
-
-Stage 07 must retain 23 nt and 24 nt as separate analysis strata while calculating target accessibility and thermodynamic strand asymmetry using these exact candidate identities.
-
-Any eventual comparison between 23-nt and 24-nt designs must distinguish:
+Stage 07 and later candidate analyses must preserve:
 
 ```text
-within-length ranking
+target_id
+transcript_id
+candidate_length_nt
 ```
 
-from:
+as explicit strata/identifiers.
 
-```text
-between-length biological/design comparison
-```
-
-and must not assume raw metric values are directly comparable across lengths unless the metric definition explicitly supports that comparison.
+This makes the downstream framework reusable across genes, transcript isoforms, organisms, and future target panels.
 
 ---
 
@@ -3786,9 +3832,8 @@ Configuration must record at minimum:
 
 ```text
 target_lengths = [23, 24]
-vdchibin_accession = "XM_022792159.1"
-vdchibin_candidate_lengths_nt = [23, 24]
-vdchibin_coordinate_system = "1-based inclusive"
+stage06_target_manifest = "resources/targets/target_manifest.tsv"
+stage06_coordinate_system = "1-based inclusive transcript coordinates"
 steprna_passenger_range = [15, 30]
 steprna_sensitivity_range = [18, 28]
 transitivity_bin_size_nt = 10
@@ -3855,26 +3900,36 @@ Relevant software versions include Python, Snakemake, stepRNA, Bowtie2 used by s
 - parsing of official stepRNA outputs;
 - separate passenger recovery and geometry denominators.
 
-### Stage 06 target/candidate preparation
+### Stage 06 generic target/candidate preparation
 
-- exact accession-version and 710-nt reference identity;
-- locked sequence SHA-256;
-- contiguous annotation coverage of 1–710;
-- exact 688-window enumeration for 23 nt;
-- exact 687-window enumeration for 24 nt;
-- exact combined total of 1,375 candidates;
-- first/last window coordinates for both lengths;
-- target-sequence slicing;
-- RNA T→U conversion;
-- exact antisense reverse-complement orientation for both lengths;
-- guide 5′/3′ endpoint correspondence;
-- deterministic length-aware candidate IDs;
-- start-region counts for both lengths;
-- full-containment counts for both lengths;
-- 44 cross-boundary 23-nt windows;
-- 46 cross-boundary 24-nt windows;
-- exact 23-nt boundary examples 308–330, 644–666 and 666–688;
-- exact 24-nt boundary examples 307–330, 643–666 and 666–689.
+Generic tests:
+
+- manifest parsing for one and multiple targets;
+- single-record and multi-record FASTA selection by `fasta_record_id`;
+- DNA and RNA input normalization to uppercase DNA alphabet;
+- expected-length and SHA-256 validation;
+- rejection of unresolved ambiguous bases;
+- arbitrary legal candidate lengths;
+- generic `L-w+1` enumeration;
+- globally unique target-aware candidate IDs;
+- exact target slicing;
+- exact antisense reverse-complement orientation;
+- annotation-present, partial-annotation and annotation-unavailable behavior;
+- `unannotated` gap handling;
+- no filtering of cross-boundary candidates;
+- no hard-coded Vd-CHIBIN constants in core enumeration logic.
+
+Vd-CHIBIN regression fixture tests:
+
+- target ID `Vd_CHIBIN`;
+- transcript `XM_022792159.1`;
+- length 710;
+- exact locked SHA-256;
+- 688 23-nt candidates;
+- 687 24-nt candidates;
+- 1,375 combined candidates;
+- known UTR/CDS boundary accounting for both lengths.
+
 
 ### Stage 05 coordinate and weighting logic
 
@@ -3973,7 +4028,7 @@ The first canonical viral pipeline is complete when:
 11. one Snakemake entry point regenerates the entire downstream viral analysis;
 12. no manual movement or copying of intermediate outputs is required;
 13. any deviation from historical results is surfaced explicitly rather than hidden;
-14. Stage 06 deterministically regenerates the locked parallel 23/24-nt Vd-CHIBIN candidate universe (688 + 687 = 1,375 rows) without running any ranking or upstream viral analysis.
+14. Stage 06 deterministically enumerates every requested candidate length for every registered transcript target without code changes per gene; the current Vd-CHIBIN fixture reproduces 688 23-nt + 687 24-nt = 1,375 rows without ranking or upstream viral analysis.
 
 ---
 
