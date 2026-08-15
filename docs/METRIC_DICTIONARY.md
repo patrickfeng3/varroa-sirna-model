@@ -1,6 +1,6 @@
 # Varroa vsiRNA Metric Dictionary
 
-**Version:** 0.5  
+**Version:** 0.6  
 **Scope:** Canonical viral pipeline through viral spatial/transitivity-consistency analysis
 
 ---
@@ -763,9 +763,54 @@ Thus using a median at the cross-sample level does **not** remove abundance info
 ---
 
 
-# 7. stepRNA geometry metrics
+# 7. Stage 03 official stepRNA geometry metrics
 
-The following quantities follow official stepRNA conventions.
+These definitions preserve the published stepRNA conventions while distinguishing official stepRNA counts from project-specific Varroa abundance weighting.
+
+## `focal_reference_sequence`
+
+**Class:** Project-specific input unit built for a published method
+
+One distinct File-A sequence within:
+
+```text
+sample × analysis_unit × focal_length × focal_strand
+```
+
+Stage 03 uses one FASTA record per distinct focal sequence.
+
+The focal sequence's observed molecular abundance is retained separately as `focal_abundance`.
+
+## `focal_abundance`
+
+**Class:** Standard/descriptive
+
+For one Stage 03 focal reference sequence:
+
+```text
+focal_abundance
+    = sum(read-level count for all canonical rows
+          carrying that focal sequence in the same
+          sample × analysis_unit × focal_length × focal_strand)
+```
+
+This field is used for project abundance-weighted reference-support summaries after stepRNA geometry reconstruction.
+
+It is not inferred from the number of stepRNA alignments.
+
+## `passenger_candidate_sequence`
+
+**Class:** Project-specific input unit built for a published method
+
+One distinct File-B sequence within the same sample-virus unit as File A, from the opposite mapped viral strand, with canonical passenger length:
+
+```text
+15–30 nt inclusive
+```
+
+Passenger FASTA sequences remain in observed physical 5′→3′ orientation.
+
+---
 
 ## `steprna_5p_distance`
 
@@ -774,69 +819,163 @@ The following quantities follow official stepRNA conventions.
 Signed 5′ distance relative to the File-A reference RNA:
 
 ```text
-negative = reference overhang
-positive = reference underhang
-0        = blunt
+negative = File-A reference overhang
+0        = blunt end
+positive = File-A reference underhang
 ```
+
+No sign transformation is applied in canonical storage.
 
 ## `steprna_3p_distance`
 
 **Class:** Published-method-derived
 
-Equivalent signed distance at the 3′ end using the same sign convention.
+Signed 3′ distance relative to the File-A reference RNA using the same convention:
+
+```text
+negative = File-A reference overhang
+0        = blunt end
+positive = File-A reference underhang
+```
+
+The 5′ and 3′ values must refer to the same reconstructed focal/passenger duplex when used in a joint-geometry metric.
+
+---
+
+## `steprna_official_duplex_count`
+
+**Class:** Published-method-derived/native software output
+
+Distance-specific count from the official stepRNA overhang output in which a File-A reference may be represented multiple times through recovered duplex relationships.
+
+This quantity must be preserved using the semantics of the installed official stepRNA version.
+
+It must **not** automatically be renamed `abundance_weighted`, because the project-wide abundance definition is based on upstream observed focal read counts, not on the number of recovered passenger alignments.
+
+## `steprna_official_unique_reference_count`
+
+**Class:** Published-method-derived/native software output
+
+Distance-specific count from the official stepRNA unique-reference overhang output.
+
+Use the official software result directly; do not silently reimplement a different uniqueness rule under the same name.
+
+---
 
 ## `passenger_length`
 
 **Class:** Published-method-derived
 
-Length of the complementary passenger sequence identified by stepRNA.
+Length of a complementary File-B passenger sequence recovered by official stepRNA.
 
-## `passenger_recovery_fraction`
-
-**Class:** Descriptive quantity based on stepRNA output
+Canonical primary File B permits passenger lengths:
 
 ```text
-passenger_recovery_fraction
-    = File-A references with at least one recovered passenger
-      / all eligible File-A references
+15–30 nt
 ```
 
-Low passenger recovery does not by itself mean Dicer processing is absent.
+## `passenger_count_per_reference`
 
-## `steprna_log_ratio` / installed stepRNA enrichment field
+**Class:** Published-method-derived/native software output
+
+Number of recovered passenger relationships associated with a File-A focal reference as represented by official stepRNA passenger-number output.
+
+This is not equivalent to passenger molecular abundance.
+
+---
+
+## `passenger_recovery_fraction_unique`
+
+**Class:** Canonical descriptive metric based on stepRNA output
+
+Within one sample-virus × focal-length × focal-strand run:
+
+```text
+passenger_recovery_fraction_unique
+    = number of distinct focal_reference_sequence values
+      with at least one recovered passenger
+      / number of distinct eligible focal_reference_sequence values
+```
+
+Range:
+
+```text
+0 to 1
+```
+
+Interpretation:
+
+> What fraction of focal sequence diversity has at least one recoverable complementary passenger?
+
+A low value does not by itself demonstrate absence of Dicer processing.
+
+## `passenger_recovery_fraction_abundance`
+
+**Class:** Canonical descriptive metric
+
+```text
+passenger_recovery_fraction_abundance
+    = Σ focal_abundance for focal references with ≥1 recovered passenger
+      / Σ focal_abundance for all eligible focal references
+```
+
+Range:
+
+```text
+0 to 1
+```
+
+Interpretation:
+
+> What fraction of accumulated focal small-RNA abundance belongs to focal sequences for which at least one passenger is recoverable?
+
+This uses upstream focal abundance and does not expand FASTA records according to read count.
+
+---
+
+## `steprna_log_ratio`
 
 **Class:** Published-method-derived
 
-Use the enrichment/log-ratio field produced by the installed official stepRNA version. Do not silently reimplement it with a different formula or rename it as a generic odds ratio unless the software output explicitly uses that definition.
+The official stepRNA distance-enrichment/log-ratio quantity produced by the pinned software version.
 
-The published method describes a log ratio comparing a distance-specific count with the mean end-distance count.
+The published method describes this as the logarithm of a ratio comparing a distance-specific overhang count with the mean count across end distances.
+
+The canonical pipeline archives and parses the official value; it does not silently substitute another odds-ratio or enrichment formula under the same name.
 
 ## `steprna_wald_z`
 
 **Class:** Published-method-derived
 
-Official stepRNA Wald Z-score for enrichment of an overhang/underhang distance.
+Official stepRNA Wald Z-score associated with distance enrichment.
 
-Use the value produced by stepRNA rather than creating a different statistic under the same name.
+Use the value produced by the pinned official stepRNA implementation.
+
+Stage 03 records this statistic; Stage 04 determines how population-level evidence should be summarized across biological samples.
 
 ---
 
 # 8. Pre-specified Varroa joint Dicer-like geometry
 
-The term “canonical Dicer geometry” is avoided as a universal label because Dicer-associated end geometry varies by pathway and organism.
+The term “canonical Dicer geometry” is avoided as a universal biological label because Dicer/Dicer-like end geometry can vary across organisms, pathways, and substrates.
 
 ## `varroa_2nt_joint_geometry`
 
 **Class:** Project-specific, pre-specified pathway feature
 
-Historical Varroa geometry of interest:
+Defined under the official stepRNA sign convention as:
 
 ```text
-5′ distance = +2
-3′ distance = -2
+steprna_5p_distance = +2
+steprna_3p_distance = -2
 ```
 
-under official stepRNA sign convention.
+Equivalent interpretation:
+
+```text
+File-A 5′ underhang = 2 nt
+File-A 3′ overhang  = 2 nt
+```
 
 Equivalent historical label:
 
@@ -844,27 +983,141 @@ Equivalent historical label:
 5p_underhang_2__3p_overhang_2
 ```
 
-This is a pre-specified Varroa feature of interest, not a universal definition of Dicer cleavage.
+The two distances must come from the **same reconstructed focal/passenger duplex**.
 
-## `varroa_2nt_fraction_all_refs`
+This feature is pre-specified before inspecting the canonical Stage 03 results and is not a universal definition of Dicer cleavage.
 
-```text
-number of all eligible File-A references supporting the joint geometry
-/ all eligible File-A references
-```
+## `n_joint_geometry_duplexes`
 
-This combines passenger recoverability and geometry and must not be interpreted alone.
+**Class:** Canonical descriptive count
 
-## `varroa_2nt_fraction_recovered`
+Number of recovered focal/passenger duplex alignments in one Stage 03 run for which:
 
 ```text
-number of passenger-recovered references supporting the joint geometry
-/ number of File-A references with at least one recovered passenger
+5p = +2
+and
+3p = -2
 ```
 
-This asks how common the geometry is **conditional on a passenger actually being recoverable**.
+## `varroa_2nt_joint_duplex_fraction`
+
+**Class:** Canonical descriptive metric
+
+```text
+varroa_2nt_joint_duplex_fraction
+    = n_joint_geometry_duplexes
+      / n_recovered_duplexes
+```
+
+where `n_recovered_duplexes` is the number of reconstructed focal/passenger duplex relationships in the same run.
+
+This is a **duplex-level** quantity. A focal reference with many recovered passengers can contribute multiple duplexes.
+
+If no duplex is recovered, report `NA`.
+
+## `n_focal_references_supporting_joint_geometry`
+
+**Class:** Canonical descriptive count
+
+Number of distinct File-A focal references with at least one recovered passenger duplex satisfying:
+
+```text
+5p = +2
+3p = -2
+```
+
+A focal reference may also support other geometries through other recovered passengers.
+
+## `varroa_2nt_reference_fraction_all`
+
+**Class:** Canonical descriptive metric
+
+```text
+varroa_2nt_reference_fraction_all
+    = n_focal_references_supporting_joint_geometry
+      / n_focal_references
+```
+
+This combines passenger recoverability and joint-geometry support.
+
+It therefore must not be interpreted alone as the geometry distribution among recovered duplexes.
+
+## `varroa_2nt_reference_fraction_recovered`
+
+**Class:** Canonical descriptive metric
+
+```text
+varroa_2nt_reference_fraction_recovered
+    = n_focal_references_supporting_joint_geometry
+      / n_recovered_focal_references
+```
+
+Interpretation:
+
+> Among distinct focal sequences for which at least one passenger is recoverable, what fraction support the pre-specified Varroa joint geometry at least once?
+
+If no focal reference has a recovered passenger, report `NA`.
+
+## `varroa_2nt_reference_fraction_abundance_all`
+
+**Class:** Canonical project-specific abundance-support metric
+
+```text
+varroa_2nt_reference_fraction_abundance_all
+    = Σ focal_abundance for focal references supporting joint geometry
+      / Σ focal_abundance for all eligible focal references
+```
+
+Interpretation:
+
+> What fraction of accumulated focal abundance is represented by focal sequences that support the pre-specified joint geometry?
+
+This is a reference-support metric, not a mutually exclusive geometry distribution.
+
+## `varroa_2nt_reference_fraction_abundance_recovered`
+
+**Class:** Canonical project-specific abundance-support metric
+
+```text
+varroa_2nt_reference_fraction_abundance_recovered
+    = Σ focal_abundance for focal references supporting joint geometry
+      / Σ focal_abundance for focal references with ≥1 recovered passenger
+```
+
+If the denominator is zero, report `NA`.
+
+Interpretation:
+
+> Conditional on focal sequences having a recoverable passenger, what fraction of accumulated focal abundance belongs to sequences supporting the pre-specified joint geometry?
 
 ---
+
+## Full-spectrum versus joint-geometry rule
+
+The **full signed 5′ and 3′ distance spectra are primary Stage 03 outputs**.
+
+`varroa_2nt_joint_geometry` is a pre-specified secondary feature of interest inside that full landscape.
+
+A strong +2/−2 result must not cause other reproducibly enriched distances to be discarded, and a different dominant distance must not be relabelled +2/−2 after the fact.
+
+---
+
+## Stage 03 abundance-weighting rule
+
+Three concepts must remain separate:
+
+```text
+official stepRNA duplex/alignment count
+official stepRNA unique-reference count
+canonical focal-abundance-weighted reference support
+```
+
+The canonical project does **not** treat the number of passenger alignments as a substitute for upstream small-RNA abundance.
+
+Abundance weighting uses `focal_abundance` derived from the canonical read-level `count` field.
+
+---
+
 
 # 9. `delta_dicer`
 

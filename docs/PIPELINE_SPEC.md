@@ -1,7 +1,7 @@
 # Canonical Varroa vsiRNA Pipeline Specification
 
-**Specification version:** 0.5  
-**Status:** Stages 00–01 implemented and validated; Stage 02 scientifically specified before implementation  
+**Specification version:** 0.6  
+**Status:** Stages 00–02 implemented and validated; Stage 03 scientifically specified before implementation  
 **Scope:** Viral small-RNA analysis through viral spatial/transitivity-consistency analysis  
 **Host transitivity:** Excluded  
 **vdCHIBIN ranking:** Excluded from this build
@@ -1212,33 +1212,90 @@ It is an empirical sequence-association layer. Mechanistic Dicer analysis begins
 ---
 
 
-# 03 — Official stepRNA Dicer-overhang analysis
+# 03 — Official stepRNA duplex-geometry reconstruction
 
-## Biological question
+## Purpose and biological question
 
-Do the 23-nt and/or 24-nt populations show complementary guide/passenger duplex-end geometry consistent with Dicer-like processing?
+Stage 03 asks whether the canonical 23-nt and/or 24-nt viral small-RNA populations contain recoverable complementary opposite-strand partners whose duplex-end geometry is consistent with Dicer/Dicer-like processing.
 
-## Primary software
+The primary question is:
 
-Use the official published **stepRNA** implementation as the primary duplex-overhang method.
+> Among canonically defined viral small RNAs, what complementary passenger strands can be recovered, what 5′/3′ end-distance geometries do the reconstructed duplexes show, and what passenger lengths are represented?
 
-The older project-native reconstruction is retained only for diagnostic comparison and historical validation.
+Stage 03 is a **measurement/reconstruction stage**. It does not yet make the canonical cross-dataset claim that one length class has stronger Dicer evidence than another. Sample-aware biological aggregation and the direct 23-versus-24 Dicer comparison belong to Stage 04.
 
-## Why the full overhang spectrum is analysed
+The primary published method is:
 
-The analysis does not define Dicer as “2-nt overhang or nothing.” stepRNA reports the full signed 5′ and 3′ overhang/underhang distributions and passenger lengths. The previously observed Varroa +2 5′ / −2 3′ joint geometry is a pre-specified feature of interest within that broader distribution.
+> Murcott B, Pawluk RJ, Protasio AV, Akinmusola RY, Lastik D, Hunt VL. 2022. *stepRNA: Identification of Dicer cleavage signatures and passenger strand lengths in small RNA sequences*. Frontiers in Bioinformatics 2:994871. DOI: 10.3389/fbinf.2022.994871.
 
-Official stepRNA sign convention must be preserved:
+---
+
+## 03.1 Method priority
+
+Use the official published **stepRNA** implementation as the primary duplex-geometry method.
+
+The canonical environment pins:
 
 ```text
-negative distance = reference overhang
-positive distance = reference underhang
-0                 = blunt end
+stepRNA == 1.0.6
 ```
 
-## File A — reference populations
+unless a future explicit project decision changes the version and updates this specification.
 
-Run separately for:
+The exact versions of Python, Bowtie2, pysam, Biopython, NumPy, and other runtime dependencies actually used must be recorded in Stage 03 provenance.
+
+The project-native/historical Dicer reconstruction is **not** used to generate the primary Stage 03 result. It is retained for Stage 04 secondary validation and historical regression only.
+
+There is no silent fallback to a custom stepRNA reimplementation if the official tool cannot be executed reproducibly.
+
+---
+
+## 03.2 Mandatory software preflight
+
+Before running the biological dataset, Stage 03 must perform a cheap preflight that records:
+
+- installed stepRNA version;
+- Bowtie2 version;
+- Python version;
+- relevant Python package versions;
+- successful invocation of the official stepRNA executable;
+- successful construction/use of a Bowtie2 index by stepRNA;
+- a synthetic or bundled-example check sufficient to confirm that the official output can be generated and parsed;
+- a sign-convention check confirming that the parser interprets a known reference 5′ underhang as positive and a known reference 3′ overhang as negative.
+
+If the preflight fails, Stage 03 stops with an explicit failure. It must not start a large batch of biological runs while repeatedly attempting undocumented workarounds.
+
+---
+
+## 03.3 Canonical biological scope
+
+Use the same biological eligibility established upstream.
+
+A sample-virus unit is included only when:
+
+```text
+primary_eligible == true
+```
+
+Observed reads used to construct Stage 03 inputs must additionally satisfy:
+
+```text
+mapping_mode == exact
+virus_assignment == assigned
+strand in {sense, antisense}
+```
+
+No remapping to the virus is performed in Stage 03.
+
+The read-level `virus` field must match eligibility `analysis_unit`.
+
+Unexpected or inconsistent categories are reported rather than silently coerced.
+
+---
+
+## 03.4 File A — focal/reference populations
+
+Generate File A separately for each eligible sample-virus unit and each focal class:
 
 ```text
 23-nt sense
@@ -1247,66 +1304,435 @@ Run separately for:
 24-nt antisense
 ```
 
-within each eligible sample-virus unit.
+A File-A population with no eligible focal sequence is not sent to stepRNA; it is recorded as a zero-signal population in Stage 03 QC.
 
-## File B — potential passengers
+### Canonical File-A representation
 
-Canonical Varroa project setting:
+The biological stepRNA run uses **collapsed distinct focal sequences**:
+
+```text
+one FASTA record per distinct
+sample × analysis_unit × focal_length × focal_strand × sequence
+```
+
+Each FASTA record receives a stable opaque identifier.
+
+The corresponding observed abundance from the read-level `count` field is stored in a separate manifest and is not encoded in a way that requires stepRNA to infer project-specific abundance semantics from the FASTA header.
+
+This collapsed-input policy follows the published use of collapsed sRNA sequence data and avoids creating enormous abundance-expanded FASTA files.
+
+---
+
+## 03.5 File B — potential passenger pool
+
+For each File-A run, File B contains potential passenger sequences from:
+
+```text
+the same sample
+× the same analysis_unit
+× the opposite mapped viral strand
+× length 15–30 nt inclusive
+```
+
+Only exact, assigned reads are eligible.
+
+File B is also collapsed to one FASTA record per distinct passenger sequence within that run, with stable opaque identifiers and a manifest retaining observed abundance.
+
+The canonical primary passenger-length range is therefore:
 
 ```text
 15–30 nt
 ```
 
-from the same sample and same virus, restricted to the opposite mapped strand relative to File A.
+This broad range is intentionally wider than the 23/24-nt focal classes so that a 23- or 24-nt focal RNA can recover a complementary passenger of a different length.
 
-A pre-specified sensitivity run uses:
+No requirement is imposed that the passenger itself be 23 or 24 nt.
+
+---
+
+## 03.6 Strand/orientation handling
+
+File-A and File-B sequences are written in their **observed physical 5′→3′ sequence orientation**.
+
+The pipeline must not manually reverse-complement the observed passenger FASTA before calling stepRNA.
+
+Complementary orientation is determined by the official stepRNA/Bowtie2 alignment procedure.
+
+Restricting File B to the opposite **mapped viral strand** defines the biological candidate pool; it does not change the physical sequence orientation supplied to stepRNA.
+
+---
+
+## 03.7 Official alignment behaviour
+
+The canonical run preserves the official stepRNA alignment logic:
+
+- Bowtie2 index built from File A;
+- File B aligned to File A;
+- local alignment;
+- no mismatches in the complementary aligned segment under the official default method;
+- terminal soft clipping retained so overhang/underhang distances can be reconstructed.
+
+Do not replace this with genome-coordinate pairing, a custom local aligner, or mismatch-tolerant matching in the primary Stage 03 analysis.
+
+Any future mismatch-tolerant analysis is exploratory and must have a separate name, configuration, and output path.
+
+---
+
+## 03.8 Official signed-distance convention
+
+All parsed Stage 03 outputs preserve the official stepRNA sign convention relative to the File-A focal/reference RNA:
+
+```text
+negative distance = File-A reference overhang
+0                 = blunt end
+positive distance = File-A reference underhang
+```
+
+The 5′ and 3′ distances must always be stored in separate explicit fields:
+
+```text
+steprna_5p_distance
+steprna_3p_distance
+```
+
+No sign conversion is applied merely to make a plot visually intuitive.
+
+---
+
+## 03.9 Passenger recovery is distinct from duplex geometry
+
+Stage 03 reports passenger recovery separately from geometry.
+
+### Unique-reference passenger recovery
+
+```text
+passenger_recovery_fraction_unique
+    = number of distinct File-A focal sequences with ≥1 recovered passenger
+      / number of distinct eligible File-A focal sequences
+```
+
+### Abundance-weighted passenger recovery
+
+```text
+passenger_recovery_fraction_abundance
+    = sum(observed focal abundance for File-A sequences with ≥1 recovered passenger)
+      / sum(observed focal abundance for all eligible File-A sequences)
+```
+
+These two quantities ask different questions:
+
+- unique mode: how broadly passenger recovery is represented across focal sequence diversity;
+- abundance mode: what fraction of the accumulated focal molecular population belongs to sequences for which a passenger is recoverable.
+
+Low passenger recovery does **not** by itself demonstrate absence of Dicer processing. Passenger strands may be unstable, under-sampled, filtered, or otherwise unrecovered.
+
+---
+
+## 03.10 Full signed geometry spectrum is the primary Stage 03 geometry output
+
+Stage 03 must retain the complete signed 5′ and 3′ distance spectra produced by official stepRNA rather than reducing the analysis to a single 2-nt category.
+
+For each biological run retain, at minimum:
+
+```text
+sample
+analysis_unit
+biological_virus
+focal_length
+focal_strand
+end                 # 5p or 3p
+signed_distance
+official_duplex_count
+official_unique_reference_count
+official stepRNA enrichment/log-ratio field(s)
+official stepRNA Wald Z field(s)
+```
+
+where the exact official field names from stepRNA 1.0.6 are preserved in raw outputs and mapped transparently into the parsed schema.
+
+The full spectrum is primary because Dicer-associated end geometry is pathway- and organism-dependent; Stage 03 must first describe the Varroa viral data rather than define Dicer as “2 nt or nothing.”
+
+---
+
+## 03.11 Native stepRNA counts versus project abundance weighting
+
+The official stepRNA output files are preserved exactly.
+
+In particular, the native stepRNA:
+
+```text
+*_overhang.csv
+*_unique_overhang.csv
+```
+
+outputs must **not** be silently relabelled as the canonical project-wide `abundance_weighted` and `unique_sequence` metrics without validating what the official file counts represent.
+
+For canonical Varroa abundance summaries, focal-sequence abundance is taken from the upstream read-level `count` field stored in the File-A manifest.
+
+Stage 03 therefore keeps three concepts distinct:
+
+1. **official duplex/alignment counts** produced by stepRNA;
+2. **official unique-reference counts** produced by stepRNA;
+3. **project abundance-weighted focal-reference support**, calculated from upstream focal-sequence abundance after geometry reconstruction.
+
+This avoids accidentally multiplying or redefining abundance through passenger multiplicity.
+
+Stage 04 will use the parsed reference/geometry support and focal abundance metadata for sample-aware population-level inference.
+
+---
+
+## 03.12 Passenger-length output
+
+For every recovered focal/passenger relationship, retain the passenger length reported by stepRNA.
+
+At pair level, produce a passenger-length summary by:
+
+```text
+sample
+analysis_unit
+focal_length
+focal_strand
+passenger_length
+```
+
+with official duplex/alignment counts and, where recoverable without ambiguity, unique focal-reference support counts.
+
+Passenger-length distributions are descriptive Stage 03 outputs. They are not treated as proof that a particular nuclease generated the focal RNA.
+
+---
+
+## 03.13 Pre-specified Varroa 2-nt joint geometry
+
+The historical Varroa analysis identified the following geometry as a feature of interest:
+
+```text
+5′ distance = +2
+3′ distance = -2
+```
+
+under the official stepRNA sign convention.
+
+This corresponds to:
+
+```text
+File-A 5′ underhang of 2 nt
+File-A 3′ overhang of 2 nt
+```
+
+The canonical name is:
+
+```text
+varroa_2nt_joint_geometry
+```
+
+It is **pre-specified before inspecting the new Stage 03 result**.
+
+It must not be called a universal “canonical Dicer geometry,” because Dicer/Dicer-like end geometries vary across organisms, pathways, and substrates.
+
+### Joint-geometry support
+
+The joint classification must use the 5′ and 3′ distances from the **same reconstructed focal/passenger duplex**.
+
+Retain at least:
+
+```text
+n_recovered_duplexes
+n_joint_geometry_duplexes
+varroa_2nt_joint_duplex_fraction
+
+n_focal_references
+n_recovered_focal_references
+n_focal_references_supporting_joint_geometry
+varroa_2nt_reference_fraction_all
+varroa_2nt_reference_fraction_recovered
+```
+
+A focal reference “supports” the joint geometry if at least one of its recovered passenger alignments has:
+
+```text
+5p = +2
+3p = -2
+```
+
+The duplex-level and reference-level quantities must not be conflated.
+
+For abundance weighting, also retain the fraction of focal molecular abundance represented by focal references that support the joint geometry. This is a **reference-support** metric, not a probability distribution over mutually exclusive distances; a focal reference can support more than one geometry through different recovered passengers.
+
+---
+
+## 03.14 No single Stage 03 “Dicer score”
+
+Stage 03 does not collapse the evidence into one project-specific Dicer score.
+
+The following remain separate:
+
+- passenger recovery;
+- full 5′ distance spectrum;
+- full 3′ distance spectrum;
+- official stepRNA enrichment/log-ratio output;
+- official stepRNA Wald Z output;
+- passenger-length distribution;
+- pre-specified joint-geometry support.
+
+The project-specific `Δ_Dicer` statistic belongs to Stage 04 as a secondary validation statistic.
+
+---
+
+## 03.15 Primary versus sensitivity passenger range
+
+The required canonical Stage 03 run uses:
+
+```text
+15–30 nt
+```
+
+passengers.
+
+A narrower:
 
 ```text
 18–28 nt
 ```
 
-because passenger-range choice is an analysis parameter rather than a biological constant.
+analysis is a **named sensitivity analysis**, not part of the mandatory primary run.
 
-## Alignment behaviour
+It may be executed later if a robustness question makes it scientifically useful, but it must:
 
-The canonical run uses official stepRNA exact complementary alignment behaviour. Mismatch-tolerant analyses, if ever performed, are exploratory and separately labelled.
+- use a separate output path;
+- preserve all other settings;
+- be labelled `passenger_18_28_sensitivity`;
+- never replace the primary 15–30-nt result silently.
 
-## Collapsed and non-collapsed modes
+This prevents an optional sensitivity run from doubling the required Stage 03 computation without a defined need.
 
-Retain both official views:
+---
 
-- unique/collapsed reference sequences;
-- non-collapsed/expression-weighted reference sequences.
+## 03.16 Required raw official outputs
 
-## Outputs retained
+For every successful official stepRNA run, preserve the native output directory or equivalent raw files needed for provenance, including the official summary files described by the published method:
 
-Retain official stepRNA outputs including:
+- overhang counts;
+- unique-reference overhang counts;
+- passenger-number output;
+- passenger-length output;
+- overhang/underhang-type output;
+- relevant classified BAM/alignment products needed to reconstruct joint 5′/3′ geometry.
 
-- 5′ overhang/underhang counts;
-- 3′ overhang/underhang counts;
-- unique-overhang counts;
-- passenger number;
-- passenger length;
-- overhang type;
-- relevant classified alignment files;
-- official log-ratio/log-odds-style enrichment output as produced by the installed stepRNA version;
-- official Wald Z-scores as produced by stepRNA.
+Raw official outputs are immutable Stage 03 products and are not manually edited.
 
-## Outputs
+---
+
+## 03.17 Canonical parsed outputs
+
+Create stable project-level tables so Stage 04 does not depend on fragile stepRNA filenames.
+
+Required parsed outputs:
+
+```text
+passenger_recovery_by_pair.tsv
+overhang_spectrum_by_pair.tsv
+passenger_length_by_pair.tsv
+joint_geometry_by_pair.tsv
+joint_geometry_references.tsv.gz
+```
+
+`joint_geometry_references.tsv.gz` contains the focal reference identifiers/sequences needed to recover the pre-specified Dicer-supported subset in Stage 04 without rerunning stepRNA.
+
+The parsed tables must retain enough identifiers to trace every summary back to:
+
+```text
+sample
+analysis_unit
+focal_length
+focal_strand
+stepRNA run ID
+```
+
+and, where reference-level support is reported, to the stable File-A focal identifier.
+
+---
+
+## 03.18 Required QC
+
+Stage 03 QC must report at least:
+
+- number of primary-eligible sample-virus units;
+- number of possible File-A populations;
+- number with non-zero focal input;
+- distinct File-A sequences by focal length/strand;
+- total focal abundance represented;
+- distinct File-B passenger sequences by run;
+- passenger-length range actually present;
+- stepRNA version;
+- Bowtie2 version;
+- successful/failed stepRNA runs;
+- zero-passenger runs;
+- focal references with ≥1 passenger;
+- maximum/minimum signed distances observed;
+- passenger lengths observed;
+- malformed/unparseable official output rows;
+- runs missing an expected official output file;
+- consistency of focal identifiers between manifests and parsed output;
+- consistency of joint-geometry counts with the classified alignments used to derive them.
+
+A zero-passenger biological run is valid data and is not automatically a pipeline failure.
+
+A software failure, missing required output, parser inconsistency, or identifier mismatch is a failure.
+
+---
+
+## 03.19 Outputs
 
 ```text
 results/03_steprna/
-    inputs/
-    raw_outputs/
-    summaries/
-    sensitivity/
+│
+├── qc/
+│   └── stage03_accounting.tsv
+│
+├── provenance/
+│   ├── software_versions.tsv
+│   └── run_manifest.tsv
+│
+├── inputs/
+│   ├── input_manifest.tsv
+│   ├── focal_reference_manifest.tsv.gz
+│   └── passenger_manifest.tsv.gz
+│
+├── raw/
+│   └── <one official stepRNA output directory per successful run>/
+│
+├── parsed/
+│   ├── passenger_recovery_by_pair.tsv
+│   ├── overhang_spectrum_by_pair.tsv
+│   ├── passenger_length_by_pair.tsv
+│   ├── joint_geometry_by_pair.tsv
+│   └── joint_geometry_references.tsv.gz
+│
+└── sensitivity/
+    └── passenger_18_28/        # absent unless explicitly run
 ```
 
-## Interpretation limit
-
-A reproducibly enriched duplex-end geometry is evidence consistent with Dicer/Dicer-like cleavage. It does not directly observe intact duplexes in vivo, identify a specific Dicer paralogue, or prove that every RNA of that length was Dicer-generated.
+Stage 03 does not need publication figures before the calculations and parser have been validated.
 
 ---
+
+## 03.20 Interpretation limits
+
+A reproducibly enriched duplex-end geometry is evidence **consistent with Dicer/Dicer-like processing**.
+
+Stage 03 does not directly observe cleavage in vivo and does not by itself:
+
+- identify a specific Varroa Dicer/Dicer-like protein;
+- prove that every RNA in a length class was Dicer-generated;
+- prove that an RNA lacking a recovered passenger was not Dicer-generated;
+- establish that 23 nt is “primary” and 24 nt is “secondary”;
+- establish RdRP-dependent amplification;
+- define a candidate-window scoring metric.
+
+Those higher-level biological comparisons and Dicer-conditioned sequence analyses begin in Stage 04.
+
+---
+
 
 # 04 — Dicer evidence aggregation and Dicer-conditioned sequence features
 
