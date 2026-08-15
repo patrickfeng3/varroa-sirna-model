@@ -1,10 +1,10 @@
 # Canonical Varroa vsiRNA Pipeline Specification
 
-**Specification version:** 0.13  
-**Status:** Stages 00–05 implemented and validated; Stage 06 scientifically specified before implementation  
-**Scope:** Viral small-RNA analysis through viral spatial/transitivity-consistency analysis  
+**Specification version:** 0.15  
+**Status:** Stages 00–06 implemented and validated; Stage 07 empirical guide-sequence analysis scientifically specified before implementation; Stage 08 candidate biophysics pre-specified and deferred until Stage 07 completion  
+**Scope:** Viral small-RNA analysis, generic transcript candidate preparation, and Stage 07 empirical guide-sequence association analysis; Stage 08 candidate biophysics pre-specified  
 **Host transitivity:** Excluded  
-**vdCHIBIN ranking:** Excluded from this build
+**Candidate ranking:** Excluded through Stage 08
 
 ---
 
@@ -32,6 +32,14 @@ Validated legacy core
 04 Duplex-geometry evidence and geometry-conditioned features
         ↓
 05 Viral spatial/transitivity-consistency analysis
+        ↓
+06 Generic transcript candidate enumeration
+
+07 Varroa empirical guide-sequence association landscape
+   (viral small-RNA dataset; independent computational branch)
+        ↓
+08 Generic candidate biophysics:
+   target accessibility + duplex-end asymmetry
 ```
 
 A key reproducibility principle is that Stage 05 has two logically separate branches:
@@ -3824,6 +3832,1639 @@ This makes the downstream framework reusable across genes, transcript isoforms, 
 ---
 
 
+# 07 — Varroa empirical guide-sequence association landscape
+
+## 07.1 Purpose
+
+Stage 07 extends the Stage 02 terminal-nucleotide analysis across the **entire physical 5′→3′ sequence** of viral 23-nt and 24-nt small RNAs.
+
+Its purpose is to ask:
+
+> Which nucleotide-position features are reproducibly over- or under-represented among observed Varroa viral small RNAs relative to the matched viral sequence opportunity, and which features are associated with disproportionate accumulation among the observed sequences?
+
+Stage 07 contains two logically separate components:
+
+1. **literature-specified validation features**
+   - adenine at antisense position 10 (`A10`);
+   - continuous GC fraction across antisense positions 9–14 (`GC9_14`);
+
+2. **unbiased single-position discovery**
+   - A/C/G/T at every physical position of 23-nt and 24-nt RNAs.
+
+Stage 07 performs **no motif/k-mer discovery** and no moving motif scan.
+
+The stage is an empirical small-RNA **representation/accumulation association analysis**, not an efficacy experiment.
+
+It must not describe a Stage 07 association as:
+
+```text
+proven AGO loading preference
+proven Dicer preference
+proven RdRP preference
+proven RNAi efficacy feature
+expected Vd-CHIBIN knockdown
+```
+
+because the underlying libraries are total small-RNA sequencing rather than AGO-IP/RISC-purified libraries or prospective knockdown experiments.
+
+---
+
+## 07.2 Academic rationale
+
+The external hypotheses come from Cedden et al. (2025), who experimentally compared insect siRNA sequence features in *Tribolium castaneum* and reported associations of higher insecticidal efficacy with, among other variables, adenine at guide position 10 and higher GC content across guide positions 9–14.
+
+Stage 07 does **not** assume that these insect-derived efficacy associations transfer to *Varroa destructor*.
+
+Instead, it asks whether the same sequence features are associated with representation or accumulation in the existing Varroa viral small-RNA population.
+
+Unbiased positional nucleotide analysis also has direct methodological precedent. High-throughput Argonaute-loading experiments have compared nucleotide frequencies at each randomized guide position between selected/loaded and input populations to reveal sequence preferences without specifying each nucleotide-position combination in advance.
+
+The matched-background principle is especially important here: apparent positional preferences must be interpreted relative to the nucleotide composition of the sequence opportunities from which the small RNAs could have arisen.
+
+---
+
+## 07.3 Pilot-analysis disclosure
+
+A non-canonical exploratory pilot was run before this formal specification.
+
+The pilot:
+
+- used the 21 read-level libraries;
+- retained exact, assigned 23/24-nt reads;
+- compared abundance-weighted frequencies with frequencies among distinct observed sequences;
+- did **not** apply canonical `primary_eligible` filtering;
+- did **not** compare against the matched viral-window background;
+- did **not** calculate formal uncertainty or multiple-testing-adjusted inference.
+
+The pilot showed:
+
+```text
+A10 abundance/unique ratio:
+23AS ≈ 0.943
+24AS ≈ 0.955
+
+GC9–14 abundance-minus-unique:
+23AS ≈ -0.0035
+24AS ≈ -0.0104
+```
+
+and nominated several exploratory position-specific signals, most notably:
+
+```text
+23 nt: A at position 21 = A at L-2
+24 nt: A at position 22 = A at L-2
+```
+
+These pilot observations are **not canonical evidence**.
+
+In particular:
+
+- `A10` and `GC9_14` remain literature-specified validation features because they were motivated from the dsRIP study before the pilot;
+- `A(L-2)` and all other pilot-nominated positions remain exploratory discoveries and receive no privileged statistical treatment;
+- the formal Stage 07 analysis must be interpreted with the knowledge that this dataset has already been inspected once.
+
+Accordingly, Stage 07 should emphasize effect sizes, confidence intervals, replication across samples/lengths/weightings, and conservative discovery correction rather than presenting formal P-values as if the dataset were completely untouched.
+
+---
+
+## 07.4 Inputs
+
+Use only the same validated frozen-core biological inputs required by Stage 02:
+
+```text
+tables/<sample>/<sample>.read_level_features.tsv.gz
+results/descriptive/eligibility.tsv
+references/consensus/<sample>.<analysis_unit>.final.background_masked.fa
+```
+
+Stage 02 outputs may be read **only for regression/QC comparison**.
+
+Stage 06 target-candidate outputs are not computational inputs to Stage 07.
+
+No remapping is performed.
+
+No stepRNA run is performed.
+
+No ViennaRNA run is performed.
+
+No live database access is required.
+
+---
+
+## 07.5 Canonical observed population
+
+Use the same primary population as Stage 02.
+
+Retain observed read-level rows only when:
+
+```text
+sample × virus matches a primary_eligible sample × analysis_unit pair
+mapping_mode = exact
+virus_assignment = assigned
+strand ∈ {sense, antisense}
+length ∈ {23, 24}
+```
+
+Canonical expected scope from the validated frozen core:
+
+```text
+20 primary samples
+54 primary-eligible sample-virus units
+```
+
+If the observed canonical counts differ from the validated Stage 01/02 population, Stage 07 must stop rather than silently redefining eligibility.
+
+Canonical sequence alphabet in TSV outputs remains:
+
+```text
+A, C, G, T
+```
+
+where `T` is the DNA-alphabet representation of RNA uridine.
+
+---
+
+## 07.6 Physical sequence orientation and position numbering
+
+Every observed small-RNA sequence is interpreted in its own sequenced physical 5′→3′ orientation.
+
+For a sequence of length `L`:
+
+```text
+position_5p = 1 ... L
+```
+
+where:
+
+```text
+position 1 = physical 5′ nucleotide
+position L = physical 3′ nucleotide
+```
+
+Also record:
+
+```text
+position_from_3p = L - position_5p + 1
+```
+
+for interpretation.
+
+Thus:
+
+```text
+23-mer position 21 = 3p3
+24-mer position 22 = 3p3
+```
+
+Observed antisense sequences are used directly.
+
+Do **not** reverse-complement observed antisense reads.
+
+Expected antisense sequences are generated by reverse-complementing the matched reference-orientation viral windows, exactly as in Stage 02.
+
+This distinction is mandatory.
+
+---
+
+## 07.7 Observed weighting modes
+
+Retain the two canonical Stage 02 weighting modes.
+
+### Unique-sequence weighting
+
+Within:
+
+```text
+sample × virus × length × strand
+```
+
+each distinct sequence contributes weight `1`.
+
+### Abundance weighting
+
+Each included read-level observation contributes its canonical numeric `count`, using the same abundance accounting as Stage 02.
+
+Stage 07 must not invent a new abundance-collapsing rule.
+
+The Stage 02 population/weighting implementation should be reused or regression-tested rather than reinterpreted.
+
+---
+
+## 07.8 Matched viral sequence-opportunity background
+
+For every primary-eligible:
+
+```text
+sample × virus × length
+```
+
+enumerate all fully supported windows independently within each FASTA record of the sample-specific depth-masked viral consensus.
+
+A supported window contains only:
+
+```text
+A, C, G, T
+```
+
+and never crosses a FASTA-record boundary.
+
+For sense expectation:
+
+```text
+expected sense RNA = reference-orientation window
+```
+
+For antisense expectation:
+
+```text
+expected antisense RNA = reverse_complement(reference-orientation window)
+```
+
+Every supported genomic start contributes one opportunity, even when identical sequence strings occur at multiple positions.
+
+This is the same sequence-opportunity background as Stage 02.
+
+It controls for the fact that a nucleotide can only be observed at a guide position if the viral substrate provides that nucleotide in the corresponding sequence opportunity.
+
+It does not control for all biological or technical biases.
+
+---
+
+# 07A — Full positional representation landscape
+
+## 07.9 Positional observed and expected fractions
+
+For every:
+
+```text
+sample
+× virus
+× length {23,24}
+× strand {antisense,sense}
+× weighting_mode {unique_sequence,abundance}
+× position {1...L}
+× nucleotide {A,C,G,T}
+```
+
+calculate:
+
+```text
+observed_fraction
+=
+observed weight carrying nucleotide b at position p
+/
+total observed weight
+```
+
+and:
+
+```text
+expected_fraction
+=
+number of supported background windows carrying nucleotide b at p
+/
+number of supported background windows
+```
+
+For every valid population and position:
+
+```text
+Σ_b observed_fraction(b) = 1
+Σ_b expected_fraction(b) = 1
+```
+
+within numerical tolerance.
+
+---
+
+## 07.10 Representation enrichment ratio
+
+Define:
+
+```text
+representation_enrichment
+=
+observed_fraction / expected_fraction
+```
+
+Interpretation:
+
+```text
+= 1  observed at the frequency predicted by viral sequence opportunity
+> 1  over-represented
+< 1  under-represented
+```
+
+If:
+
+```text
+expected_fraction = 0
+```
+
+then enrichment is `NA`.
+
+No pseudocount is added.
+
+Also calculate the zero-safe paired difference:
+
+```text
+representation_delta_fraction
+=
+observed_fraction - expected_fraction
+```
+
+The enrichment ratio is the main interpretable effect-size ratio.
+
+The delta fraction is the main zero-safe quantity for paired inferential testing.
+
+---
+
+## 07.11 Accumulation contrast
+
+For a fixed:
+
+```text
+sample × virus × length × strand × position × nucleotide
+```
+
+define:
+
+```text
+unique_fraction
+=
+observed_fraction under unique-sequence weighting
+
+abundance_fraction
+=
+observed_fraction under abundance weighting
+```
+
+Then:
+
+```text
+accumulation_ratio
+=
+abundance_fraction / unique_fraction
+```
+
+when `unique_fraction > 0`.
+
+Equivalent, when both representation enrichments are finite:
+
+```text
+accumulation_ratio
+=
+representation_enrichment_abundance
+/
+representation_enrichment_unique
+```
+
+because the same matched expected fraction appears in both denominators.
+
+Interpretation:
+
+```text
+> 1
+sequences carrying this nucleotide-position feature
+contribute disproportionately high accumulated abundance
+relative to how common the feature is among distinct observed sequences
+
+≈ 1
+little abundance-versus-diversity shift
+
+< 1
+feature is disproportionately associated with lower accumulated abundance
+```
+
+Also calculate:
+
+```text
+accumulation_delta_fraction
+=
+abundance_fraction - unique_fraction
+```
+
+for zero-safe paired inference.
+
+If `accumulation_ratio > 0`, optionally report:
+
+```text
+log2_accumulation_ratio
+=
+log2(accumulation_ratio)
+```
+
+No pseudocount is used.
+
+Stage 07 must not translate an accumulation ratio into a fold-change in RNAi efficacy.
+
+---
+
+# 07B — Literature-specified validation features
+
+## 07.12 A10
+
+For antisense 23-nt and 24-nt populations, report the complete Stage 07 positional metrics for:
+
+```text
+position = 10
+nucleotide = A
+```
+
+under both unique-sequence and abundance weighting, together with the abundance-versus-unique accumulation contrast.
+
+The relevant external hypothesis is:
+
+> A at antisense position 10 was associated with higher siRNA efficacy in the Tribolium dsRIP study.
+
+The Stage 07 question is narrower:
+
+> Is A10 over-represented and/or disproportionately accumulated in Varroa viral antisense 23/24-nt small-RNA populations relative to the matched viral sequence opportunity?
+
+A negative or null result must be retained.
+
+No `+10` scoring bonus is imported from dsRIP.
+
+---
+
+## 07.13 Continuous GC9–14
+
+For every observed and expected sequence, calculate:
+
+```text
+GC9_14_fraction
+=
+number of G/C nucleotides at positions 9,10,11,12,13,14
+/
+6
+```
+
+For each sample-virus × length × strand calculate:
+
+```text
+observed_GC9_14_mean_unique
+observed_GC9_14_mean_abundance
+expected_GC9_14_mean
+```
+
+Then:
+
+```text
+GC9_14_delta_unique_vs_expected
+=
+observed_GC9_14_mean_unique
+-
+expected_GC9_14_mean
+```
+
+```text
+GC9_14_delta_abundance_vs_expected
+=
+observed_GC9_14_mean_abundance
+-
+expected_GC9_14_mean
+```
+
+and:
+
+```text
+GC9_14_accumulation_delta
+=
+observed_GC9_14_mean_abundance
+-
+observed_GC9_14_mean_unique
+```
+
+The primary GC9–14 feature is **continuous**.
+
+Do not threshold at 50% GC in the canonical analysis.
+
+The dsRIP web tool's later scoring threshold is not treated as the underlying biological hypothesis.
+
+---
+
+## 07.14 Validation-family inference
+
+The literature-specified antisense validation family consists of:
+
+```text
+A10:
+2 lengths ×
+{unique representation, abundance representation, accumulation}
+
+GC9_14:
+2 lengths ×
+{unique representation, abundance representation, accumulation}
+```
+
+for:
+
+```text
+12 pre-specified validation tests
+```
+
+Use two-sided tests.
+
+The formal analysis must not force the effect into the direction reported in Tribolium.
+
+Apply Benjamini–Hochberg FDR correction across these 12 tests.
+
+Because the same dataset was already viewed in the pilot, these tests are described as **formal literature-guided validation within the existing dataset**, not as independent replication on untouched data.
+
+Primary reporting emphasizes:
+
+```text
+effect size
+95% sample-clustered bootstrap CI
+raw P
+BH-adjusted P
+direction
+```
+
+---
+
+# 07C — Unbiased single-position discovery
+
+## 07.15 Discovery search space
+
+Calculate every nucleotide at every physical position.
+
+No nucleotide-position combination is excluded from the output.
+
+For new discovery claims, define the internal-position search space:
+
+```text
+positions 3 ... L-2
+```
+
+because:
+
+```text
+positions 1, 2, L-1, L
+```
+
+were already explicitly analysed in Stage 02 and are reserved primarily for regression/previous-evidence interpretation.
+
+Thus the internal discovery families contain:
+
+```text
+23 nt:
+19 internal positions × 4 bases = 76 hypotheses per endpoint
+
+24 nt:
+20 internal positions × 4 bases = 80 hypotheses per endpoint
+```
+
+A10 is present in this unbiased landscape even though it is also reported separately as a literature-specified feature.
+
+Pilot-nominated features such as `A at L-2` receive no special correction or pass criterion.
+
+---
+
+## 07.16 Primary discovery scope
+
+Primary biological discovery scope:
+
+```text
+strand = antisense
+```
+
+because antisense viral small RNAs are in the orientation complementary to viral target RNA and are therefore the most directly relevant population for later guide-oriented design hypotheses.
+
+However:
+
+```text
+antisense read
+≠
+proven AGO-loaded guide
+```
+
+The complete sense analysis is retained as a **secondary comparator** using the same positional definitions and matched sense background.
+
+A discovery that appears similarly in sense and antisense populations is interpreted more cautiously than an antisense-dominant signal.
+
+---
+
+## 07.17 Discovery endpoints and multiple testing
+
+For each length separately, analyze three endpoint families:
+
+```text
+1. unique-sequence representation delta
+2. abundance-weighted representation delta
+3. abundance-versus-unique accumulation delta
+```
+
+For each base-position hypothesis, obtain a sample-level paired test as defined below.
+
+Because nucleotide-position hypotheses are strongly dependent:
+
+- the four nucleotide fractions at one position are compositionally constrained;
+- neighboring sequence positions can also be correlated;
+
+use:
+
+```text
+Benjamini–Yekutieli FDR
+```
+
+as the **primary discovery correction** within each:
+
+```text
+length × endpoint × strand
+```
+
+family.
+
+Also report conventional Benjamini–Hochberg adjusted P-values as a sensitivity/comparability column.
+
+A canonical discovery claim requires at minimum:
+
+```text
+BY-adjusted P < 0.05
+```
+
+plus a finite, directionally interpretable effect size.
+
+Effect-size magnitude and cross-sample consistency remain more important than the adjusted P-value alone.
+
+---
+
+# 07D — Sample-aware inference
+
+## 07.18 Pair → sample → dataset aggregation
+
+The biological sequencing sample remains the top-level replication unit.
+
+For every fixed metric:
+
+1. calculate the metric separately in every primary-eligible sample-virus unit;
+2. within each sample, take the median across its eligible viruses;
+3. across samples, take the median of sample-level medians.
+
+For representation enrichment:
+
+```text
+dataset effect
+=
+median across samples
+of within-sample median pair-level enrichment ratios
+```
+
+For representation delta, accumulation ratio/delta, and GC9–14 deltas, use the same hierarchy.
+
+Do not pool all reads, viruses, or sample-virus units into one pseudo-replicate.
+
+---
+
+## 07.19 Sample-clustered uncertainty
+
+For every canonical dataset-level effect size use a sample-clustered percentile bootstrap:
+
+1. resample sample IDs with replacement;
+2. retain all eligible viruses belonging to a resampled sample;
+3. recompute within-sample medians;
+4. recompute the dataset median;
+5. use the 2.5th and 97.5th percentiles.
+
+Canonical bootstrap count:
+
+```text
+5000 replicates
+```
+
+Record:
+
+```text
+seed
+requested replicates
+valid replicates
+interval method
+```
+
+No read-level bootstrap is substituted for sample-level uncertainty.
+
+---
+
+## 07.20 Paired inferential test
+
+For inferential P-values, use the sample-level paired **difference** rather than the enrichment ratio.
+
+Representation:
+
+```text
+sample_delta
+=
+within-sample median(
+    observed_fraction - expected_fraction
+)
+```
+
+Accumulation:
+
+```text
+sample_delta
+=
+within-sample median(
+    abundance_fraction - unique_fraction
+)
+```
+
+GC9–14 uses the corresponding observed-minus-expected or abundance-minus-unique sample-level delta.
+
+Primary paired test:
+
+```text
+two-sided exact sign test
+```
+
+across non-zero sample-level deltas.
+
+This tests whether the direction of the paired difference is consistently positive or negative across independent samples while making minimal distributional assumptions.
+
+Record:
+
+```text
+n_samples_total
+n_samples_nonzero
+n_positive
+n_negative
+raw_p
+```
+
+If too few non-zero sample differences are available for a meaningful test, return `NA` and report the estimability limitation rather than substituting another test silently.
+
+---
+
+# 07E — Stage 02 regression and quality control
+
+## 07.21 Exact terminal regression
+
+The full Stage 07 positional engine must reproduce Stage 02 at the four previously analysed terminal positions.
+
+Mapping:
+
+```text
+position 1   ↔ 5p1
+position 2   ↔ 5p2
+position L-1 ↔ 3p2
+position L   ↔ 3p1
+```
+
+Regression must cover:
+
+```text
+23 nt and 24 nt
+sense and antisense
+unique-sequence and abundance weighting
+all A/C/G/T nucleotides
+pair-level observed fractions
+pair-level expected fractions
+pair-level enrichment ratios
+sample-balanced aggregate enrichment
+```
+
+Expected numerical tolerance:
+
+```text
+<= 1e-12
+```
+
+for quantities that are algebraically identical.
+
+Any systematic failure is treated as an orientation/background/weighting bug and blocks canonical Stage 07 completion.
+
+---
+
+## 07.22 Accounting QC
+
+Stage 07 must verify:
+
+- primary eligibility matches Stage 02;
+- expected primary sample count = 20;
+- expected primary-eligible sample-virus units = 54;
+- mapping mode is exact;
+- virus assignment is assigned;
+- only 23/24 nt are included;
+- observed sequence length agrees with declared length;
+- no unexpected nucleotide alphabet is silently coerced;
+- sense/antisense orientation is preserved;
+- expected windows never cross FASTA-record boundaries;
+- unsupported/N-containing background windows are excluded;
+- A/C/G/T observed and expected fractions each sum to 1 at every valid position;
+- no pseudocount is used in enrichment calculations;
+- all 23 positions and all 24 positions are present where estimable;
+- Stage 02 terminal regression passes.
+
+---
+
+# 07F — Outputs
+
+## 07.23 Canonical output tree
+
+```text
+results/07_empirical_sequence/
+│
+├── positional_by_pair.tsv
+├── positional_by_sample.tsv
+├── positional_summary.tsv
+│
+├── gc9_14_by_pair.tsv
+├── gc9_14_by_sample.tsv
+├── gc9_14_summary.tsv
+│
+├── literature_validation.tsv
+├── discovery_summary.tsv
+├── sense_comparator.tsv
+│
+├── qc/
+│   ├── stage07_accounting.tsv
+│   └── stage02_terminal_regression.tsv
+│
+└── provenance/
+    └── stage07_manifest.tsv
+```
+
+Canonical inference lives in TSV outputs.
+
+Plots may be produced for interpretation, but no plot is a source of truth.
+
+---
+
+## 07.24 Required positional-summary fields
+
+At minimum:
+
+```text
+strand
+length
+position_5p
+position_from_3p
+nucleotide
+weighting_mode
+
+n_samples
+sample_balanced_observed_fraction
+sample_balanced_expected_fraction
+sample_balanced_representation_enrichment
+sample_balanced_representation_delta_fraction
+
+bootstrap_ci_low
+bootstrap_ci_high
+
+sign_test_n_nonzero
+sign_test_n_positive
+sign_test_n_negative
+raw_p
+bh_p
+by_p
+```
+
+The accumulation summary additionally records:
+
+```text
+sample_balanced_unique_fraction
+sample_balanced_abundance_fraction
+sample_balanced_accumulation_ratio
+sample_balanced_accumulation_delta_fraction
+log2_accumulation_ratio
+```
+
+where estimable.
+
+---
+
+# 07G — Interpretation limits
+
+## 07.25 What Stage 07 can support
+
+A robust result can support wording such as:
+
+> nucleotide X at physical position p is reproducibly over-represented among observed Varroa viral antisense 23/24-nt small RNAs relative to matched viral sequence opportunity.
+
+or:
+
+> observed sequences carrying nucleotide X at position p contribute disproportionately high abundance relative to their prevalence among distinct observed sequences.
+
+It may also support:
+
+> this association is shared across 23/24 nt,
+
+or:
+
+> this association is stronger in antisense than in the sense comparator,
+
+when the corresponding analyses justify those statements.
+
+---
+
+## 07.26 What Stage 07 cannot establish
+
+Stage 07 does not directly distinguish among:
+
+- Dicer cleavage preference;
+- Argonaute loading preference;
+- small-RNA stability;
+- source-RNA abundance;
+- viral replication/transcription structure;
+- other processing biology;
+- technical library-preparation bias.
+
+Small-RNA library construction can itself introduce sequence-dependent representation bias, particularly through RNA-ligation steps and interactions between adapters and small-RNA sequence/structure.
+
+The matched viral-window background corrects for **viral sequence opportunity**, but it does not remove sequence-dependent library-preparation bias.
+
+Therefore even a highly reproducible Stage 07 positional association is an **empirical small-RNA representation/accumulation feature**, not automatically a molecular selection rule.
+
+Direct AGO/RISC-IP sequencing or prospective wet-lab knockdown experiments would provide stronger evidence for loading or efficacy.
+
+---
+
+## 07.27 Relationship to candidate design
+
+Stage 07 creates **organism-specific empirical sequence evidence** that may later be evaluated on Stage 06 target candidates.
+
+It does not assign a candidate score in Stage 07.
+
+A discovered feature is not automatically converted into points or a fixed weight.
+
+Later integration must distinguish:
+
+```text
+literature-supported + Varroa-supported feature
+
+Varroa-discovered association only
+
+literature-supported feature not reproduced in Varroa
+```
+
+and must preserve the difference between:
+
+```text
+representation/accumulation association
+```
+
+and:
+
+```text
+experimentally validated knockdown efficacy
+```
+
+No motif/k-mer feature is introduced by this stage.
+
+No predictive train/test model is part of canonical Stage 07 v1.
+
+A regularized multivariable predictive model may be considered later only if the transparent single-position analysis identifies sufficiently stable signal and a clear prediction target is defined.
+
+---
+
+# 08 — Generic candidate biophysics: target accessibility and duplex-end thermodynamic asymmetry
+
+## 08.1 Purpose
+
+Stage 08 calculates two **raw biophysical candidate features** for every Stage 06 transcript interval:
+
+1. target-site accessibility on the supplied mature transcript; and
+2. relative thermodynamic stability of the two 5′ ends of the perfectly complementary guide/passenger duplex.
+
+The implementation must remain **target-agnostic**.
+
+Vd-CHIBIN is the first regression target, not an algorithmic special case.
+
+Stage 08 does **not**:
+
+- join Stage 02 nucleotide-enrichment values;
+- use Stage 03/04 duplex geometry;
+- use Stage 05 transitivity;
+- convert raw features to percentiles;
+- calculate A, T, N, S or another aggregate score;
+- apply an asymmetry pass/fail gate;
+- rank candidates;
+- select target regions;
+- implement Stage 09.
+
+The historical weighted A/T/N/S scanner is a regression reference only and is not automatically inherited by the canonical pipeline.
+
+---
+
+## 08.2 Inputs
+
+Canonical inputs:
+
+```text
+resources/targets/target_manifest.tsv
+results/06_targets/target_candidates.tsv
+```
+
+plus each registered transcript FASTA referenced by the target manifest.
+
+No Stage 00–05 result table is a computational dependency.
+
+No live database fetch is permitted during canonical Stage 08 execution.
+
+Stage 08 must preserve at least:
+
+```text
+target_id
+transcript_id
+candidate_id
+candidate_length_nt
+start_1based
+end_1based
+target_sequence_rna
+antisense_guide_sequence_rna
+```
+
+from Stage 06.
+
+---
+
+# 08A — Target-site accessibility
+
+## 08.3 Biological interpretation
+
+Accessibility is calculated on the **target transcript / sense mRNA**, not on the antisense guide.
+
+The primary quantity is:
+
+```text
+P_unpaired(candidate)
+```
+
+defined as the equilibrium probability, under the RNAplfold local partition-function model, that the **entire candidate interval** is simultaneously unpaired.
+
+Higher values mean that the complete target interval is predicted to be more available for intermolecular recognition.
+
+This is a computational secondary-structure prediction, not a direct measurement of in-vivo RNA structure.
+
+Published experimental and computational studies support target accessibility as a determinant of siRNA/RISC target recognition, while also showing that accessibility is only one contributor to silencing efficacy.
+
+---
+
+## 08.4 RNAplfold model
+
+Use ViennaRNA `RNAplfold`.
+
+Canonical software requirement:
+
+```text
+ViennaRNA = 2.7.2
+```
+
+or an explicitly updated version recorded in provenance and revalidated against the Stage 08 regression tests before becoming canonical.
+
+RNAplfold computes local partition functions and unpaired probabilities using sliding windows.
+
+For a candidate ending at transcript coordinate `e` with length `w`, extract the `_lunp` value corresponding to:
+
+```text
+[e-w+1 ... e]
+```
+
+at interval length `w`.
+
+The extraction must be tested against hand-checked synthetic output so that end-coordinate versus start-coordinate indexing cannot be reversed.
+
+---
+
+## 08.5 Canonical accessibility parameter profile
+
+The current project profile preserves the previously audited three RNAplfold scales:
+
+Primary:
+
+```text
+label = W150_L100_main
+W = 150
+L = 100
+```
+
+Sensitivity:
+
+```text
+label = W100_L80_sensitivity
+W = 100
+L = 80
+```
+
+and:
+
+```text
+label = W200_L150_sensitivity
+W = 200
+L = 150
+```
+
+Canonical model temperature:
+
+```text
+T = 37.0 °C
+```
+
+For each target:
+
+```text
+u = maximum candidate_length_nt requested for that target
+```
+
+Thus the current Vd-CHIBIN 23/24 analysis uses:
+
+```text
+u = 24
+```
+
+and both 23-nt and 24-nt accessibility values are extracted from the same RNAplfold run for a given W/L parameter set.
+
+The three W/L choices are **project modelling scales**, not universal biological constants. Their purpose is to test whether candidate accessibility is robust to reasonable changes in local folding context.
+
+Stage 09 must not treat agreement across these settings as independent biological replication.
+
+---
+
+## 08.6 Generic handling of transcript length
+
+The Stage 08 engine must not assume a 710-nt transcript.
+
+For requested RNAplfold window `W_req`, maximum base-pair span `L_req`, and transcript length `N`:
+
+```text
+W_eff = min(W_req, N)
+L_eff = min(L_req, W_eff)
+```
+
+Record both requested and effective values.
+
+Require:
+
+```text
+u <= W_eff
+```
+
+for every enabled parameter set.
+
+If this is not satisfied, fail clearly rather than silently truncating the requested unpaired interval.
+
+---
+
+## 08.7 Accessibility outputs
+
+For each candidate record:
+
+```text
+accessibility_p_W150_L100
+accessibility_p_W100_L80
+accessibility_p_W200_L150
+```
+
+and descriptive robustness summaries:
+
+```text
+accessibility_p_min
+accessibility_p_max
+accessibility_p_range
+```
+
+where:
+
+```text
+accessibility_p_min
+    = minimum probability across enabled parameter sets
+
+accessibility_p_max
+    = maximum probability across enabled parameter sets
+
+accessibility_p_range
+    = accessibility_p_max - accessibility_p_min
+```
+
+These remain raw/descriptive values.
+
+Do **not** convert them to percentiles or combine them with fixed weights in Stage 08.
+
+Important cross-length rule:
+
+> the probability that an entire 24-nt interval is unpaired is a stricter event than the corresponding 23-nt event.
+
+Therefore raw 23-nt and 24-nt full-interval probabilities must not automatically be treated as directly comparable efficacy scores.
+
+Any cross-length normalization belongs in Stage 09.
+
+---
+
+# 08B — Duplex-end thermodynamic asymmetry
+
+## 08.8 Biological rationale
+
+For a perfectly complementary small-RNA duplex, the two strands can differ in the local stability of their 5′ ends.
+
+Classical RNAi studies showed that the strand whose 5′ end is less stably paired is often preferentially selected as guide during RISC assembly. Drosophila studies provide direct mechanistic evidence that RISC-loading machinery can sense terminal duplex asymmetry.
+
+However:
+
+```text
+favourable terminal asymmetry
+≠
+guaranteed guide loading
+≠
+guaranteed knockdown
+```
+
+The canonical project has not established a Varroa-specific quantitative loading rule.
+
+Stage 08 therefore calculates **raw asymmetry features** and directional signs only.
+
+---
+
+## 08.9 Duplex definition
+
+For each Stage 06 candidate:
+
+```text
+guide
+    = antisense_guide_sequence_rna, 5′→3′
+
+passenger
+    = target_sequence_rna, 5′→3′
+```
+
+These sequences are exact reverse complements and define a perfectly paired RNA/RNA duplex for the purpose of the terminal-stability calculation.
+
+No Dicer overhang is added.
+
+No mismatch is introduced.
+
+No candidate-specific secondary structure is folded for this calculation.
+
+The metric is a local duplex-end stability surrogate, not the free energy of the entire small-RNA duplex.
+
+---
+
+## 08.10 Nearest-neighbour model
+
+Use canonical Watson–Crick RNA/RNA nearest-neighbour stacking free energies from the ViennaRNA default Turner-2004 parameter model at 37 °C.
+
+The implementation must obtain or validate the stacking parameters from the pinned ViennaRNA parameter set; it must not silently substitute unrelated DNA, RNA/DNA or alternative fitted parameters.
+
+The provenance record must include:
+
+```text
+ViennaRNA version
+parameter-set identity
+temperature
+```
+
+The nearest-neighbour model is appropriate because RNA duplex stability depends on adjacent base-pair stacks rather than independent base-pair counts.
+
+---
+
+## 08.11 Main terminal asymmetry definition
+
+Primary terminal length:
+
+```text
+4 paired nucleotides
+```
+
+This contains:
+
+```text
+3 nearest-neighbour stacks
+```
+
+For the guide 5′ end:
+
+```text
+guide_5p_stack_dg_4bp_kcal_mol
+    = sum of the 3 Turner nearest-neighbour stack ΔG°37 terms
+      across the first 4 paired nucleotides at the guide 5′ end
+```
+
+For the passenger 5′ end:
+
+```text
+passenger_5p_stack_dg_4bp_kcal_mol
+    = analogous sum at the passenger 5′ end
+```
+
+Define:
+
+```text
+asymmetry_ddg_4bp_kcal_mol
+    =
+    guide_5p_stack_dg_4bp_kcal_mol
+    -
+    passenger_5p_stack_dg_4bp_kcal_mol
+```
+
+Because more-negative duplex free energy is more stable:
+
+```text
+asymmetry_ddg_4bp > 0
+```
+
+means:
+
+> the desired antisense guide 5′ end is less stably paired than the passenger 5′ end.
+
+This direction is consistent with the classical strand-selection tendency.
+
+Stage 08 must not call this a pass/fail rule.
+
+---
+
+## 08.12 Five-nucleotide sensitivity feature
+
+Also calculate a pre-specified terminal-length sensitivity feature using:
+
+```text
+5 paired nucleotides
+= 4 nearest-neighbour stacks
+```
+
+with:
+
+```text
+guide_5p_stack_dg_5bp_kcal_mol
+passenger_5p_stack_dg_5bp_kcal_mol
+asymmetry_ddg_5bp_kcal_mol
+```
+
+and the same sign convention.
+
+This sensitivity is retained because published Drosophila siRNA analyses have used terminal free-energy windows spanning approximately the first five nucleotides, and because the previous project workflow used a 5-bp sensitivity calculation.
+
+The 4-bp and 5-bp features are correlated model summaries, not independent experiments.
+
+---
+
+## 08.13 Stack-only terminology
+
+The Stage 08 quantities above are deliberately named:
+
+```text
+stack_dg
+```
+
+because they sum nearest-neighbour stacking terms.
+
+They are **not** labelled as complete duplex formation free energies.
+
+Unless explicitly added in a future specification, Stage 08 does not add:
+
+- duplex initiation terms;
+- 3′ DNA/RNA overhang terms;
+- concentration-dependent melting terms;
+- whole-duplex RNAcofold energies;
+- target-opening penalties to the asymmetry calculation.
+
+This explicit naming prevents the historical stack-only metric from being over-interpreted as a complete physical ΔG of duplex formation.
+
+---
+
+## 08.14 Asymmetry robustness annotations
+
+Descriptive fields:
+
+```text
+asymmetry_direction_4bp
+asymmetry_direction_5bp
+asymmetry_direction_consistent
+```
+
+where direction is:
+
+```text
+guide_5p_less_stable     if ΔΔG > 0
+equal_within_numeric_tol if |ΔΔG| <= numeric tolerance
+guide_5p_more_stable     if ΔΔG < 0
+```
+
+and `asymmetry_direction_consistent` indicates whether the 4-bp and 5-bp calculations support the same non-zero direction.
+
+This is annotation only.
+
+No candidate is filtered in Stage 08.
+
+---
+
+# 08C — Generic outputs, QC and interpretation
+
+## 08.15 Canonical outputs
+
+```text
+results/08_candidate_biophysics/
+│
+├── candidate_accessibility.tsv
+├── candidate_thermodynamic_asymmetry.tsv
+├── candidate_biophysics.tsv
+│
+├── qc/
+│   └── stage08_accounting.tsv
+│
+└── provenance/
+    ├── stage08_manifest.tsv
+    └── rnaplfold_runs.tsv
+```
+
+`candidate_biophysics.tsv` is the canonical Stage 08 joined table.
+
+It must contain exactly one row for every Stage 06 candidate.
+
+---
+
+## 08.16 Required canonical joined-table fields
+
+Carry forward:
+
+```text
+target_id
+transcript_id
+candidate_id
+candidate_length_nt
+start_1based
+end_1based
+target_sequence_rna
+antisense_guide_sequence_rna
+```
+
+Accessibility:
+
+```text
+accessibility_p_W150_L100
+accessibility_p_W100_L80
+accessibility_p_W200_L150
+accessibility_p_min
+accessibility_p_max
+accessibility_p_range
+```
+
+Thermodynamic asymmetry:
+
+```text
+guide_5p_stack_dg_4bp_kcal_mol
+passenger_5p_stack_dg_4bp_kcal_mol
+asymmetry_ddg_4bp_kcal_mol
+
+guide_5p_stack_dg_5bp_kcal_mol
+passenger_5p_stack_dg_5bp_kcal_mol
+asymmetry_ddg_5bp_kcal_mol
+
+asymmetry_direction_4bp
+asymmetry_direction_5bp
+asymmetry_direction_consistent
+```
+
+No Stage 08 column may be called:
+
+```text
+A
+T
+N
+S
+score
+rank
+pass
+fail
+primary_score
+secondary_score
+```
+
+---
+
+## 08.17 Generic QC
+
+### Accounting
+
+For every target × candidate-length stratum:
+
+```text
+Stage 08 row count = Stage 06 row count
+```
+
+and globally:
+
+```text
+Stage 08 canonical rows = Stage 06 canonical rows
+```
+
+No candidate may disappear because of low accessibility or unfavourable asymmetry.
+
+### Accessibility
+
+Require:
+
+- all probabilities finite;
+- `0 <= P_unpaired <= 1`;
+- exact Stage 06 coordinate match;
+- candidate length equals extracted RNAplfold interval length;
+- extraction uses candidate end coordinate and requested interval length correctly;
+- sensitivity summary arithmetic is exact;
+- one RNAplfold run per target × parameter set, not per candidate;
+- requested/effective W/L/u values recorded.
+
+### Thermodynamic asymmetry
+
+Require:
+
+- guide remains exact reverse complement of target;
+- 4-bp calculation uses exactly 3 terminal stacks;
+- 5-bp calculation uses exactly 4 terminal stacks;
+- guide 5′ and passenger 5′ ends are not swapped;
+- stored `ΔΔG = guide - passenger`;
+- sign annotation matches stored ΔΔG;
+- hand-calculated regression examples agree with implementation;
+- no infeasible-energy sentinel such as `100000` is accepted.
+
+### Genericity
+
+Tests must include at least one non-Vd-CHIBIN synthetic transcript and non-23/24 candidate length for the reusable helper functions.
+
+Target-specific regression tests may additionally use Vd-CHIBIN.
+
+---
+
+## 08.18 Vd-CHIBIN regression requirements
+
+For the current first target:
+
+```text
+target_id = Vd_CHIBIN
+transcript_id = XM_022792159.1
+Stage 06 rows = 1,375
+```
+
+Expected Stage 08 rows:
+
+```text
+23 nt = 688
+24 nt = 687
+total = 1,375
+```
+
+Accessibility regression should compare the canonical W150/L100, W100/L80 and W200/L150 raw values against the previously audited Vd-CHIBIN accessibility outputs when those historical files are supplied as a regression fixture.
+
+Thermodynamic regression should compare the new 4-bp/5-bp stack-sum calculation against the previously corrected Vd-CHIBIN thermodynamic table when that historical table is supplied as a regression fixture.
+
+Historical files are **regression checks only**, not Stage 08 computational inputs.
+
+If the historical regression fixture is absent, canonical Stage 08 must still run from Stage 06 + the registered transcript FASTA.
+
+---
+
+## 08.19 Interpretation limitations
+
+Accessibility limitations:
+
+- RNAplfold predicts a thermodynamic secondary-structure ensemble;
+- it does not directly measure in-vivo structure;
+- RNA-binding proteins, translation, modifications, cellular localization and non-equilibrium folding can alter real accessibility;
+- W/L choices define a model of local structural context.
+
+Thermodynamic-asymmetry limitations:
+
+- the feature is based on a perfectly complementary duplex;
+- the stack-only calculation is a local stability surrogate;
+- actual small-RNA termini, overhangs, 5′ phosphorylation, Argonaute identity and loading cofactors can affect strand selection;
+- classical asymmetry rules are supported strongly in model systems such as Drosophila, but no quantitative Varroa-specific loading function is assumed.
+
+Therefore Stage 08 results should be described as:
+
+```text
+predicted target accessibility
+and
+predicted duplex-end thermodynamic asymmetry
+```
+
+not as direct measurements of RNAi efficacy.
+
+---
+
+## 08.20 Carry-forward to Stage 09
+
+Stage 09 may integrate Stage 08 raw features with empirical Stage 02 terminal-nucleotide evidence.
+
+Before defining Stage 09, the project must decide explicitly:
+
+- within-target normalization;
+- within-length versus cross-length comparison;
+- whether accessibility robustness should use main/min/range or another rule;
+- whether asymmetry sign should be a gate, a continuous feature, or both;
+- whether any weights are justified.
+
+The historical:
+
+```text
+A = 0.70 main + 0.30 robustness
+T = 0.70 main + 0.30 robustness
+S = 0.60A + 0.30T + 0.10N
+```
+
+must **not** be imported automatically.
+
+No arbitrary ranking weights are defined in Stage 08.
+
+---
+
 ## 6. Reproducibility requirements
 
 All new outputs are written under `results/` in the canonical repository.
@@ -3834,6 +5475,15 @@ Configuration must record at minimum:
 target_lengths = [23, 24]
 stage06_target_manifest = "resources/targets/target_manifest.tsv"
 stage06_coordinate_system = "1-based inclusive transcript coordinates"
+
+stage08_viennarna_version = "2.7.2"
+stage08_temperature_c = 37.0
+stage08_accessibility_parameter_sets = [
+    ["W150_L100_main", 150, 100],
+    ["W100_L80_sensitivity", 100, 80],
+    ["W200_L150_sensitivity", 200, 150]
+]
+stage08_asymmetry_terminal_lengths_nt = [4, 5]
 steprna_passenger_range = [15, 30]
 steprna_sensitivity_range = [18, 28]
 transitivity_bin_size_nt = 10
@@ -3899,6 +5549,79 @@ Relevant software versions include Python, Snakemake, stepRNA, Bowtie2 used by s
 - official stepRNA sign convention;
 - parsing of official stepRNA outputs;
 - separate passenger recovery and geometry denominators.
+
+### Stage 07 empirical guide-sequence landscape
+
+Population/background tests:
+
+- exact reuse of Stage 02 primary eligibility;
+- exact/assigned 23/24-nt population only;
+- observed antisense sequence used directly in physical 5′→3′ orientation;
+- expected antisense generated only by reverse-complementing matched viral windows;
+- complete A/C/G/T positional accounting for all 23/24 positions;
+- expected windows exclude N/ambiguous bases and never cross FASTA-record boundaries;
+- unique-sequence and abundance weightings reproduce Stage 02 definitions.
+
+Metric tests:
+
+- exact positional observed fraction;
+- exact matched expected fraction;
+- representation enrichment and delta;
+- abundance-versus-unique accumulation ratio and delta;
+- no pseudocount behavior at zero/undefined denominators;
+- exact continuous GC9–14 calculation;
+- exact A10 extraction;
+- position-from-3′ mapping (`L-p+1`).
+
+Inference tests:
+
+- pair → sample → dataset median hierarchy;
+- 5000-sample clustered bootstrap with fixed seed in regression tests;
+- exact sign-test accounting for positive/negative/non-zero sample deltas;
+- BH validation-family correction;
+- BY primary discovery-family correction;
+- separate length/endpoint/strand correction families.
+
+Regression:
+
+- position 1 = 5p1;
+- position 2 = 5p2;
+- position L-1 = 3p2;
+- position L = 3p1;
+- exact Stage 02 terminal observed/expected/enrichment regression within 1e-12.
+
+### Stage 08 generic candidate biophysics
+
+Accessibility tests:
+
+- `_lunp` end-coordinate/interval-length indexing on a hand-checkable synthetic profile;
+- probability range 0–1;
+- one RNAplfold run per target × W/L parameter set;
+- exact Stage 06 candidate accounting;
+- correct extraction for arbitrary candidate lengths;
+- DNA/RNA transcript normalization inherited from the locked target;
+- W/L effective-value handling for transcripts shorter than requested W;
+- failure when requested unpaired length exceeds effective W;
+- exact min/max/range summaries.
+
+Thermodynamic-asymmetry tests:
+
+- exact reverse-complement orientation;
+- guide 5′ end and passenger 5′ end identified correctly;
+- 4-bp feature = exactly 3 Turner stack terms;
+- 5-bp feature = exactly 4 Turner stack terms;
+- `ΔΔG = guide - passenger`;
+- positive sign means guide 5′ is less stable;
+- hand-calculated canonical Watson–Crick examples;
+- rejection of missing/non-finite/sentinel energies;
+- non-Vd-CHIBIN synthetic candidate regression.
+
+Vd-CHIBIN accounting regression:
+
+- 688 23-nt rows;
+- 687 24-nt rows;
+- 1,375 joined rows;
+- no candidate loss.
 
 ### Stage 06 generic target/candidate preparation
 
@@ -4003,8 +5726,8 @@ This build excludes:
 - Ago2 host analysis;
 - host transitivity;
 - inferred host-trigger analysis;
-- Stage 07 ViennaRNA vdCHIBIN accessibility/thermodynamic scoring;
-- Stage 08 feature integration;
+- Stage 09 feature integration and normalization;
+- Stage 10 candidate ranking/selection;
 - vdCHIBIN final ranking;
 - construct architecture comparison;
 - Nectar Designer integration.
@@ -4028,7 +5751,9 @@ The first canonical viral pipeline is complete when:
 11. one Snakemake entry point regenerates the entire downstream viral analysis;
 12. no manual movement or copying of intermediate outputs is required;
 13. any deviation from historical results is surfaced explicitly rather than hidden;
-14. Stage 06 deterministically enumerates every requested candidate length for every registered transcript target without code changes per gene; the current Vd-CHIBIN fixture reproduces 688 23-nt + 687 24-nt = 1,375 rows without ranking or upstream viral analysis.
+14. Stage 06 deterministically enumerates every requested candidate length for every registered transcript target without code changes per gene; the current Vd-CHIBIN fixture reproduces 688 23-nt + 687 24-nt = 1,375 rows without ranking or upstream viral analysis;
+15. Stage 07 reproduces the Stage 02 terminal landscape exactly while extending matched-background sequence association analysis to every 23/24-nt position, with literature-guided A10/GC9–14 validation, conservative multiple-testing control, and no efficacy/ranking claim;
+16. Stage 08 preserves every Stage 06 row while calculating only raw target-accessibility and duplex-end-asymmetry features, with no candidate filtering, scoring, ranking, or Stage 00–05 rerun.
 
 ---
 
