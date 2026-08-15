@@ -1,6 +1,6 @@
 # Varroa vsiRNA Metric Dictionary
 
-**Version:** 0.8  
+**Version:** 0.9  
 **Scope:** Canonical viral pipeline through viral spatial/transitivity-consistency analysis
 
 ---
@@ -1773,7 +1773,9 @@ This is the geometric mean of the local sense and antisense 23-nt signals.
 
 High values require both strands to be represented.
 
-It is a **primary-like anchor score**, not proof that the locus is biologically primary.
+It is a **23-nt spatial anchor score**.
+
+High values identify bins with concurrent 23S and 23AS signal for spatial analysis. They do not establish that the locus is primary, Dicer-derived, or causally upstream of 24-nt production.
 
 ## `combined23_anchor_score`
 
@@ -1786,6 +1788,8 @@ combined23_anchor_score = 23S + 23AS
 ```
 
 Measures total local 23-nt signal without requiring strand balance.
+
+This is also a spatial anchor score only; it does not assign biochemical pathway origin.
 
 ---
 
@@ -1906,7 +1910,7 @@ Historical field:
 D24_antisense_minus_sense
 ```
 
-**Class:** Project-specific primary/secondary endpoint
+**Class:** Project-specific spatial endpoint
 
 ```text
 antisense_specific_directionality
@@ -1924,6 +1928,8 @@ Interpretation:
 ```
 
 The subtraction is intended to control for generic positional asymmetry that affects both 24-nt strands.
+
+This endpoint measures strand-controlled spatial directionality. It is not a direct classifier of primary versus secondary biogenesis or Dicer versus RdRP origin.
 
 ---
 
@@ -2062,6 +2068,8 @@ If no preferred shifts exist, historical v1.4.1 falls back to all non-zero circu
 Within one contig and permutation replicate, **the same shift is applied to 24-AS and 24-S**.
 
 The 23-nt tracks and anchors remain fixed.
+
+The circular operation is a statistical randomization device used to preserve the internal spatial structure/autocorrelation of the shifted tracks while breaking their registration relative to the 23-nt anchors. It does not imply that the viral genome is biologically circular.
 
 ---
 
@@ -2209,7 +2217,7 @@ Each historical family therefore contains three P-values.
 
 **Class:** Canonical multiple-testing summary
 
-For the primary sample-balanced analysis, one family is defined for each biological endpoint across:
+For the primary sample-balanced observational analysis, one pre-specified inferential family is defined for each endpoint across:
 
 ```text
 2 weighting modes × 2 anchor definitions × 3 windows = 12 tests
@@ -2222,7 +2230,7 @@ delta_F24_AS
 antisense_specific_directionality
 ```
 
-Robustness/descriptive analyses are not silently used as additional routes to a primary significance claim.
+Robustness/descriptive analyses are not silently used as additional routes to a primary inferential claim.
 
 ---
 
@@ -2244,15 +2252,19 @@ A stable sign/magnitude across exclusions supports broader robustness; strong ch
 
 # 25. Interpretation hierarchy for Stage 05
 
-The two main biological endpoints answer different questions.
+Stage 05 is an **observational spatial analysis**. It does not assume that 23 nt is a primary/Dicer class or that 24 nt is a secondary/RdRP class.
+
+The two main endpoints answer different questions.
 
 ## `antisense_specific_directionality`
 
 Asks:
 
-> Is 24-AS more downstream-biased than the 24-S control?
+> Is 24-AS more downstream-biased than the 24-S control around predefined 23-nt spatial hotspots?
 
 This is about **absolute spatial directionality after strand control**.
+
+A positive value is consistent with antisense-specific downstream displacement of 24-nt signal. It does not establish the biochemical source of that signal.
 
 ## `delta_F24_AS`
 
@@ -2262,7 +2274,36 @@ Asks:
 
 This is about **length composition**, not total abundance.
 
-A dataset can show a positive composition shift while showing little or no antisense-specific absolute directionality. That pattern is exactly why both metrics must be kept separate.
+A positive value means a relative compositional shift toward 24 nt. It does not necessarily mean that total 24-nt abundance increased downstream.
+
+A dataset can therefore show:
+
+```text
+positive delta_F24_AS
++
+near-zero antisense_specific_directionality
+```
+
+without showing an absolute downstream wave of 24-AS molecules.
+
+Such a pattern may be **consistent with** amplification/transitivity-associated biology, but it is not sufficient to prove RdRP-dependent secondary siRNA production or a 23→24 precursor-product relationship.
+
+## Stage 05 ranking rule
+
+Stage 05 metrics are analysis outputs only.
+
+Do not automatically convert any of the following into an intrinsic vdCHIBIN window score:
+
+```text
+balanced23_anchor_score
+combined23_anchor_score
+antisense_specific_directionality
+delta_F24_AS
+crosscorr_23_to_24(lag)
+lag_asymmetry_AS_minus_S
+```
+
+If the spatial analysis later informs design, it should first be considered at a regional/construct level and only after a separately documented decision.
 
 ---
 
@@ -2390,7 +2431,7 @@ rho_joint_contrast_abundance_vs_unique
 
 These sequence metrics remain exploratory/candidate-development quantities. Stage 04 does not automatically turn them into a candidate-scoring dimension.
 
-## Project-specific spatial/transitivity metrics
+## Project-specific Stage 05 spatial/transitivity-consistency metrics
 
 ```text
 balanced23_anchor_score
@@ -2480,7 +2521,7 @@ geometry-conditioned sequence preference = an independent ranking score
 
 Natural viral infection creates structured complementary RNA substrates, while passenger stability, post-cleavage processing, library preparation, and sequence recoverability can alter the sequenced population. stepRNA reconstructs compatible focal/passenger relationships from independently sequenced RNAs; it does not directly observe the original physical cleavage event.
 
-Stage 05 may add independent evidence about viral spatial/transitivity behaviour, but it must not retroactively turn Stage 03/04 geometry into a pathway assignment that those stages do not support.
+Stage 05 is the next analysis stage and may add independent evidence about 23/24 viral spatial relationships consistent with amplification/transitivity-associated biology. It is observational and analysis-only: it must not retroactively turn Stage 03/04 geometry into a pathway assignment, assume 23 nt is primary/Dicer-derived, assume 24 nt is secondary/RdRP-derived, or automatically create a candidate-ranking metric.
 
 ---
 

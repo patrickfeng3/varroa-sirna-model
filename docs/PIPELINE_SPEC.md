@@ -1,7 +1,7 @@
 # Canonical Varroa vsiRNA Pipeline Specification
 
-**Specification version:** 0.8  
-**Status:** Stages 00–04 implemented and validated; Stage 05 is the next analysis stage  
+**Specification version:** 0.9  
+**Status:** Stages 00–04 implemented and validated; Stage 05 scientifically specified before implementation  
 **Scope:** Viral small-RNA analysis through viral spatial/transitivity-consistency analysis  
 **Host transitivity:** Excluded  
 **vdCHIBIN ranking:** Excluded from this build
@@ -36,10 +36,12 @@ Validated legacy core
 
 A key reproducibility principle is that Stage 05 has two named outputs:
 
-- **historical_v1.4.1_replication** — reproduces the uploaded v1.4.1 algorithm exactly enough to match its archived results.
-- **canonical_transitivity_analysis** — preserves the biological endpoints of v1.4.1 but improves cross-dataset inference by respecting sample-level clustering.
+- **historical_v1.4.1_replication** — reproduces the uploaded v1.4.1 algorithm exactly enough to match its archived results and terminology.
+- **canonical_transitivity_analysis** — preserves the spatial endpoints of v1.4.1 but improves cross-dataset inference by respecting sample-level clustering and uses mechanism-neutral interpretation.
 
 The historical result is a regression target, not an input to the canonical calculation.
+
+Stage 05 is an **analysis-only stage**. It does not create a vdCHIBIN candidate score, does not alter Stage 02–04 ranking features, and does not assign 23- or 24-nt populations to a biochemical pathway.
 
 ---
 
@@ -2605,9 +2607,32 @@ The safest mechanistic language remains **consistent with**, **associated with**
 
 ## 05.1 Biological question
 
-Is the 24-nt antisense population spatially related to primary-like 23-nt processing in a pattern **consistent with** secondary/transitive amplification?
+Are local 23-nt viral small-RNA hotspots associated with a reproducible downstream change in the 24-nt antisense population, either in absolute spatial directionality or in antisense 23:24 length composition?
 
-This is an observational analysis of natural viral infections. Viral replication can itself create spatially structured complementary RNA, so the result cannot by itself prove RdRP-mediated transitivity.
+The analysis asks whether such a spatial relationship is **consistent with** amplification/transitivity-associated biology. It does **not** assume in advance that:
+
+```text
+23 nt = primary/Dicer product
+24 nt = secondary/RdRP product
+```
+
+Stages 03–04 showed that duplex geometry is insufficient to make that pathway assignment, so Stage 05 treats 23 nt and 24 nt first as empirically distinct length populations.
+
+This is an observational analysis of natural viral infections. Viral replication, replication intermediates, subgenomic RNA production, local sequence/mappability, RNA stability, and library ascertainment can themselves create spatial structure. A positive Stage 05 result therefore cannot by itself prove RdRP-mediated transitivity or identify the nuclease/polymerase responsible.
+
+### Analysis-only rule
+
+Stage 05 is performed first as biological/spatial analysis only.
+
+It does **not**:
+
+- create a per-window vdCHIBIN transitivity score;
+- change candidate-ranking weights;
+- label a candidate as “primary-like” or “secondary-like”;
+- promote a spatial endpoint into Stage 08/09 design scoring;
+- infer a universal propagation distance.
+
+Any later use of Stage 05 in construct-level design interpretation would require a separate, prospectively documented decision after the Stage 05 results are reviewed.
 
 ## 05.2 Audited historical reference implementation
 
@@ -2743,7 +2768,7 @@ For each sample-virus-contig and weighting mode, construct 10-nt binned tracks:
 24 antisense
 ```
 
-## 05.11 Primary-like 23-nt anchor scores
+## 05.11 23-nt spatial anchor scores
 
 Two predefined anchor signals are analysed separately.
 
@@ -2763,7 +2788,9 @@ combined23 = 23S + 23AS
 
 This measures total local 23-nt activity without requiring strand balance.
 
-Neither score proves that a locus is biologically primary; they define **primary-like spatial anchors** for this analysis.
+These scores identify reproducible local 23-nt hotspots for spatial analysis.
+
+They do **not** imply that the hotspot is biologically primary, Dicer-derived, or upstream of 24-nt production. Historical v1.4.1 terminology referring to “primary-like” anchors is retained only inside the historical replication/provenance where needed for exact reproducibility.
 
 ## 05.12 Exact historical anchor selection
 
@@ -2823,13 +2850,15 @@ D_24AS = normalized directionality of 24-nt antisense
 D_24S  = normalized directionality of 24-nt sense
 ```
 
-Primary directionality contrast:
+Strand-controlled directionality contrast:
 
 ```text
 antisense_specific_directionality = D_24AS - D_24S
 ```
 
 A positive value means 24-AS is more downstream-biased than the 24-S control track.
+
+This is a spatial endpoint. It is not, by itself, a primary-versus-secondary or Dicer-versus-RdRP classifier.
 
 ## 05.15 Antisense 23→24 composition endpoint
 
@@ -2877,6 +2906,8 @@ where `max_window_bins = 500 / 10 = 50` under default settings.
 Thus shifts within 500 nt of zero in either circular direction are excluded when possible.
 
 If no such shifts exist for a short reference, the historical function falls back to **all non-zero circular shifts**. The canonical replication must report whenever this fallback occurs.
+
+The use of a circular shift is a **statistical randomization device**. It does not assert that the analysed viral reference is biologically circular. The shift preserves within-track spatial autocorrelation while disrupting registration of the 24-nt tracks relative to the fixed 23-nt anchor locations.
 
 For each permutation index, different contigs may receive different randomly drawn allowed shifts; higher-level null statistics are then calculated by aggregating the same permutation index across contigs.
 
@@ -2959,7 +2990,7 @@ Thus each historical BH family contains three P-values.
 
 ### Canonical inference
 
-For the primary sample-balanced analysis, define one confirmatory family per biological endpoint across all predefined combinations:
+For the primary sample-balanced observational analysis, define one pre-specified inferential family per biological endpoint across all predefined combinations:
 
 ```text
 2 weighting modes × 2 anchor definitions × 3 windows = 12 tests
@@ -3033,20 +3064,53 @@ These numbers are **regression checkpoints only**. They are never loaded as inpu
 The viral analysis may support statements such as:
 
 - 23- and 24-nt spatial association;
-- downstream/upstream asymmetry;
-- an antisense-specific directional effect if present;
+- downstream/upstream asymmetry around predefined 23-nt hotspots;
+- an antisense-specific 24-nt directional effect if present;
 - a downstream shift in antisense 23/24 length composition;
-- consistency with secondary/amplification-associated biology.
+- a spatial pattern **consistent with** amplification/transitivity-associated biology.
 
-It must not by itself establish:
+The two primary endpoints must remain distinct:
 
+- positive `antisense_specific_directionality` supports an **absolute antisense-specific downstream bias** of the 24-nt population relative to the 24S control;
+- positive `delta_F24_AS` supports a **relative downstream shift in antisense 23:24 composition toward 24 nt**.
+
+A positive `delta_F24_AS` with little or no positive `antisense_specific_directionality` therefore means:
+
+> the downstream antisense population is relatively more 24-nt rich,
+
+not:
+
+> there is a demonstrated downstream wave of newly generated 24-nt siRNAs.
+
+Stage 05 must not by itself establish:
+
+- that a 23-nt hotspot is a primary/Dicer cleavage site;
 - that every 23-mer is primary;
 - that every 24-mer is secondary;
+- that a 23→24 spatial association proves biochemical precursor→product order;
 - that RdRP directly synthesizes 24-mers;
 - that 24-mers are Dicer-independent;
+- that spatial directionality proves RNAi transitivity rather than viral replication-associated structure;
 - a universal propagation distance;
 - a specific Dicer/Ago/RdRP paralogue;
 - host-mRNA transitivity.
+
+### Carry-forward rule
+
+Stage 05 produces **analysis outputs only**.
+
+No Stage 05 quantity, including:
+
+```text
+antisense_specific_directionality
+delta_F24_AS
+crosscorr_23_to_24
+lag_asymmetry_AS_minus_S
+```
+
+is automatically converted into a per-window vdCHIBIN ranking metric.
+
+If Stage 05 later informs design, the appropriate level is expected to be **regional/construct-level interpretation**, not an intrinsic score assigned independently to each hypothetical 24-nt candidate window.
 
 ## 05.26 Required outputs
 
@@ -3061,7 +3125,7 @@ results/05_viral_transitivity/
         leave_one_virus_out.tsv
         cross_correlation.tsv
         regression_check.tsv
-    canonical_transitivity_analysis/
+    canonical_transitivity_analysis/   # mechanism-neutral canonical spatial analysis
         transitivity_by_pair.tsv
         transitivity_by_sample.tsv
         sample_balanced_results.tsv
@@ -3229,7 +3293,7 @@ The first canonical viral pipeline is complete when:
 4. official stepRNA is the primary Dicer-overhang method;
 5. sample clustering is respected in canonical cross-dataset uncertainty estimates;
 6. historical Stage 05 reproduces the uploaded v1.4.1 results within numerical tolerance;
-7. canonical Stage 05 recomputes the same biological endpoints with sample-balanced inference;
+7. canonical Stage 05 recomputes the same spatial endpoints with sample-balanced inference;
 8. all major choices are configuration-controlled;
 9. all critical calculations have deterministic tests;
 10. all metrics are defined in `docs/METRIC_DICTIONARY.md`;
