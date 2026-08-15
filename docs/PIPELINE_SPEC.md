@@ -1,7 +1,7 @@
 # Canonical Varroa vsiRNA Pipeline Specification
 
-**Specification version:** 0.4  
-**Status:** Stage 00 implemented and validated; Stage 01 scientifically specified before implementation  
+**Specification version:** 0.5  
+**Status:** Stages 00–01 implemented and validated; Stage 02 scientifically specified before implementation  
 **Scope:** Viral small-RNA analysis through viral spatial/transitivity-consistency analysis  
 **Host transitivity:** Excluded  
 **vdCHIBIN ranking:** Excluded from this build
@@ -583,19 +583,71 @@ A material discrepancy must be documented and investigated. The canonical calcul
 
 # 02 — Length-matched terminal nucleotide enrichment
 
+## Purpose
+
+Stage 02 measures whether terminal nucleotides in the newly reconstructed 23-nt and 24-nt viral small-RNA populations occur more or less often than expected from the viral sequence space that was actually available in each infection.
+
+Stage 02 does **not** assume that any terminal preference exists. It reconstructs observed and expected terminal composition independently, calculates enrichment within each biological sample-virus unit, and only then summarizes the pattern across samples.
+
+The primary cross-dataset result is sample-balanced. A separate **pooled-abundance** result is retained as a secondary descriptive view of the total accumulated molecular pool; it must never replace the sample-balanced biological summary.
+
 ## Biological question
 
-Do observed 23-nt and 24-nt Varroa viral small RNAs contain terminal nucleotide patterns more or less often than expected from the viral sequence actually available for processing?
+Do observed 23-nt and 24-nt *Varroa* viral small RNAs contain terminal nucleotide patterns more or less often than expected from the viral sequence actually available for processing?
 
-## Inputs
+Secondary descriptive question:
 
-- exact eligible 23/24 read-level data;
-- sample-specific depth-masked viral consensuses;
-- eligibility table.
+> Which terminal patterns dominate the total accumulated eligible viral small-RNA molecules when sequencing abundance is allowed to weight the complete dataset?
 
-## Terminal positions
+These are different questions and are reported separately.
 
-For each physical sequenced RNA in its own 5′→3′ orientation:
+---
+
+## 02.1 Inputs
+
+Use only validated frozen-core inputs:
+
+```text
+tables/<sample>/<sample>.read_level_features.tsv.gz
+results/descriptive/eligibility.tsv
+references/consensus/<sample>.<analysis_unit>.final.background_masked.fa
+```
+
+Stage 01 outputs may be used for regression/QC comparison of population totals, but Stage 02 must be calculable directly from the validated frozen inputs and must not require historical terminal-enrichment outputs.
+
+No remapping is performed.
+
+---
+
+## 02.2 Canonical inclusion criteria
+
+Retain observed read-level rows only when:
+
+```text
+sample × virus matches a primary_eligible sample × analysis_unit pair
+mapping_mode = exact
+virus_assignment = assigned
+strand ∈ {sense, antisense}
+length ∈ {23, 24}
+```
+
+Cross-virus ambiguous reads are excluded from virus-specific primary summaries.
+
+Observed sequences are interpreted in the DNA-alphabet representation present in FASTQ/FASTA files:
+
+```text
+A, C, G, T
+```
+
+Biologically, `T` corresponds to uridine (`U`) in the RNA molecule. Canonical TSV outputs use `T` consistently to avoid silent T/U conversion inside the workflow.
+
+Observed sequence strings must agree with their declared length. Unexpected non-ACGT bases in an included observed 23/24-nt sequence are reported as a data-integrity failure rather than silently coerced.
+
+---
+
+## 02.3 Terminal coordinates
+
+For every physical RNA sequence in its own 5′→3′ orientation:
 
 ```text
 5p1 = first nucleotide
@@ -604,22 +656,217 @@ For each physical sequenced RNA in its own 5′→3′ orientation:
 3p1 = final nucleotide
 ```
 
-## Observed frequency
-
-For each sample × virus × length × strand × weighting mode, calculate the observed A/C/G/U frequency at each terminal position.
-
-## Expected frequency
-
-Enumerate every fully supported window of the same length from the sample-specific depth-masked viral consensus.
-
-- Sense expectation uses reference orientation.
-- Antisense expectation uses reverse-complement orientation.
-- Combined-strand expectation is weighted by the observed sense/antisense mixture for the corresponding unit; it is not forced to 50:50.
-
-## Enrichment ratio
+Example:
 
 ```text
-enrichment_ratio = observed_fraction / expected_fraction
+5′ A C ........ T G 3′
+   ↑ ↑          ↑ ↑
+ 5p1 5p2      3p2 3p1
+```
+
+The names `3p2` and `3p1` are therefore defined from the physical 3′ end, not from left-to-right reference coordinates.
+
+### Observed antisense orientation
+
+An observed antisense read-level sequence is already represented as the sequenced RNA in its own 5′→3′ orientation.
+
+Therefore:
+
+```text
+observed antisense sequence → use directly
+```
+
+Do **not** reverse-complement observed antisense reads before extracting terminal nucleotides.
+
+### Expected antisense orientation
+
+Expected antisense RNAs are generated from reference-orientation viral windows:
+
+```text
+reference window
+    ↓
+reverse complement
+    ↓
+hypothetical antisense RNA in 5′→3′ orientation
+```
+
+This is where reverse complementation belongs.
+
+---
+
+## 02.4 Weighting modes for the observed population
+
+Calculate all primary Stage 02 enrichment quantities under both Stage 01 weighting modes.
+
+### Abundance weighting
+
+Each included observed RNA contributes its numeric read-level `count`.
+
+For one sample-virus × length × strand population:
+
+```text
+observed_total_weight
+    = sum(count)
+```
+
+A read with `count = 1000` contributes 1000 times as much observed molecular abundance as a read with `count = 1`.
+
+### Unique-sequence weighting
+
+Use the same Stage 01 sequence identity:
+
+```text
+sample × analysis_unit × length × strand × sequence
+```
+
+Each distinct sequence contributes exactly 1 within that unit, regardless of read abundance or number of read names carrying it.
+
+Sense and antisense sequences are deduplicated separately before any combined-strand calculation.
+
+### Expected-background weighting
+
+The matched viral background is a **sequence-opportunity background**. Every fully supported genomic start position contributes one candidate window. Repeated identical window sequences at different supported positions therefore contribute once per genomic position.
+
+This same positional opportunity background is used for abundance and unique-sequence observed modes. The two modes differ in how the **observed** RNA population is weighted; they do not redefine the viral genome itself.
+
+---
+
+## 02.5 Observed terminal frequency
+
+For every:
+
+```text
+sample
+× analysis_unit
+× length {23,24}
+× strand {sense,antisense}
+× weighting_mode {abundance,unique_sequence}
+× terminal_position {5p1,5p2,3p2,3p1}
+× nucleotide {A,C,G,T}
+```
+
+calculate:
+
+```text
+observed_fraction
+    = observed weight carrying nucleotide b at position p
+      / total observed weight for that population
+```
+
+If the observed population denominator is zero, `observed_fraction` is `NA` for all four nucleotides at that position and the zero-signal unit is reported in QC.
+
+For every valid non-zero population and position:
+
+```text
+Σ observed_fraction(A,C,G,T) = 1
+```
+
+within numerical tolerance.
+
+---
+
+## 02.6 Matched expected viral background
+
+For every primary-eligible sample-virus unit and target length `L ∈ {23,24}`, enumerate all length-`L` windows independently within each FASTA record of the corresponding sample-specific depth-masked consensus.
+
+A window is **fully supported** only if every base in the window is one of:
+
+```text
+A, C, G, T
+```
+
+Any window containing `N` or another non-ACGT character is excluded from the expected background.
+
+Windows must never cross FASTA-record/contig boundaries.
+
+### Sense expectation
+
+For every fully supported reference-orientation window:
+
+```text
+expected sense RNA = reference window
+```
+
+Extract `5p1`, `5p2`, `3p2`, and `3p1` directly.
+
+### Antisense expectation
+
+For the same fully supported reference window:
+
+```text
+expected antisense RNA = reverse_complement(reference window)
+```
+
+Then extract terminal positions from that antisense sequence in its own 5′→3′ orientation.
+
+### Expected fraction
+
+For nucleotide `b` and position `p`:
+
+```text
+expected_fraction(b,p)
+    = number of fully supported candidate windows carrying b at p
+      / total number of fully supported candidate windows
+```
+
+Sense and antisense expected fractions are calculated separately.
+
+If no fully supported window exists for a required sample-virus × length background, the corresponding expected frequencies and enrichment values are `NA` and the unit is prominently reported in QC.
+
+For every valid background and position:
+
+```text
+Σ expected_fraction(A,C,G,T) = 1
+```
+
+within numerical tolerance.
+
+---
+
+## 02.7 Combined-strand observed and expected frequencies
+
+Retain three strand scopes:
+
+```text
+sense
+antisense
+combined
+```
+
+The combined observed population is the direct combination of the included sense and antisense observed populations under the same weighting mode.
+
+The combined expected background must **not** be forced to a 50:50 sense/antisense mixture.
+
+For each sample-virus × length × weighting mode, define:
+
+```text
+wS  = observed sense weight / (observed sense weight + observed antisense weight)
+wAS = observed antisense weight / (observed sense weight + observed antisense weight)
+```
+
+when the denominator is non-zero.
+
+Then:
+
+```text
+expected_fraction_combined(b,p)
+    = wS  × expected_fraction_sense(b,p)
+      + wAS × expected_fraction_antisense(b,p)
+```
+
+Thus the expected combined composition is matched to the actual strand mixture of that biological unit and weighting mode.
+
+If the combined observed denominator is zero, `wS`, `wAS`, combined observed frequencies, combined expected frequencies, and combined enrichment are `NA`.
+
+---
+
+## 02.8 Pair-level enrichment ratio
+
+For every valid sample-virus × length × strand scope × weighting mode × terminal position × nucleotide:
+
+```text
+enrichment_ratio
+    = observed_fraction / expected_fraction
 ```
 
 Interpretation:
@@ -628,45 +875,342 @@ Interpretation:
 1   = observed as often as sequence availability predicts
 >1  = enriched
 <1  = depleted
+0   = nucleotide was not observed although it was available in the background
 ```
 
-If the expected fraction is zero, the ratio is `NA`; no arbitrary pseudocount is introduced.
+If:
 
-## Across-dataset summaries
+```text
+expected_fraction = 0
+```
 
-Retain both:
+then:
 
-- historical/pair-level median enrichment across eligible sample-virus units;
-- sample-balanced median of within-sample medians.
+```text
+enrichment_ratio = NA
+```
 
-Confidence intervals for the canonical sample-balanced summary use sample-clustered bootstrap resampling.
+No arbitrary pseudocount is added.
 
-The historical design-facing field `median_enrichment_ratio` remains available for regression comparison and must be clearly labelled if a new sample-balanced field is also exported.
+If the observed denominator is zero, the enrichment is also `NA` rather than zero.
 
-## 23-versus-24 comparison
+Stage 02 enrichment is an empirical association and does not identify which molecular process produced it.
 
-Use Spearman rank correlation to compare matched 23- and 24-nt enrichment landscapes, including at least overall and antisense-specific comparisons.
+---
 
-## Outputs
+## 02.9 Canonical sample-balanced aggregation
+
+The primary cross-dataset summary treats the biological sequencing sample as the top-level replication unit.
+
+For each fixed:
+
+```text
+length
+× strand_scope
+× weighting_mode
+× terminal_position
+× nucleotide
+```
+
+perform:
+
+1. calculate `enrichment_ratio` separately for every eligible sample-virus unit;
+2. within each sample, take the median of finite enrichment ratios across its eligible viruses;
+3. across samples, take the median of those sample-level medians.
+
+This produces:
+
+```text
+sample_balanced_median_enrichment_ratio
+```
+
+The point estimate is the **median of matched pair-level ratios**, not a ratio of separately aggregated observed and expected frequencies.
+
+### Canonical uncertainty
+
+Use a sample-clustered percentile bootstrap:
+
+1. resample sample IDs with replacement;
+2. when a sample is selected, retain its eligible virus observations together;
+3. recompute its within-sample median;
+4. recompute the across-sample median;
+5. report the 2.5th and 97.5th percentiles.
+
+Record the seed, requested bootstrap replicates, valid replicates, and interval method in the output/provenance.
+
+No read-level or virus-row bootstrap is substituted for the sample-clustered primary uncertainty estimate.
+
+---
+
+## 02.10 Pair-balanced historical/regression summary
+
+Also retain:
+
+```text
+pair_median_enrichment_ratio
+    = median of finite enrichment_ratio values
+      across eligible sample-virus units
+```
+
+This is useful for historical regression because it corresponds most closely to the previous design-facing `median_enrichment_ratio` logic.
+
+It is **not** the canonical primary cross-dataset inference because samples containing multiple eligible viruses contribute multiple pair observations.
+
+If a historical-compatible field named exactly `median_enrichment_ratio` is exported, it must be explicitly documented as the pair-balanced legacy-compatible quantity; the canonical sample-balanced field must have a different unambiguous name.
+
+---
+
+## 02.11 Secondary pooled-abundance description
+
+In addition to the primary sample-balanced abundance analysis, calculate one explicitly secondary molecular-pool view for **abundance weighting only**.
+
+This asks:
+
+> What terminal enrichment characterizes the total accumulated eligible molecules across the complete dataset when high-abundance/high-depth infections are allowed to contribute proportionally more molecular weight?
+
+It does **not** estimate the typical biological sample.
+
+For each fixed:
+
+```text
+length
+× strand_scope
+× terminal_position
+× nucleotide
+```
+
+let, for sample-virus unit `u`:
+
+```text
+N_u = total observed abundance of the relevant length/strand scope
+O_u = observed abundance carrying nucleotide b at position p
+E_u = matched expected_fraction(b,p) for that unit
+```
+
+using only units for which the matched expected fraction is defined.
+
+Calculate:
+
+```text
+pooled_abundance_observed_fraction
+    = Σ O_u / Σ N_u
+```
+
+and the abundance-matched expected frequency:
+
+```text
+pooled_abundance_expected_fraction
+    = Σ (N_u × E_u) / Σ N_u
+```
+
+Then:
+
+```text
+pooled_abundance_enrichment_ratio
+    = pooled_abundance_observed_fraction
+      / pooled_abundance_expected_fraction
+```
+
+For `combined`, `E_u` is the abundance-mode observed-strand-weighted combined expectation defined above.
+
+This formulation preserves each unit's matched viral background while allowing its accumulated molecular abundance to determine its contribution to the pooled molecular view.
+
+If the pooled abundance denominator is zero or the pooled expected fraction is zero, report `NA`.
+
+### Interpretation and inferential status
+
+`pooled_abundance_enrichment_ratio` is **secondary descriptive output only**.
+
+It must:
+
+- be labelled `pooled_abundance` or equivalent in every output;
+- report total contributing observed abundance, number of contributing sample-virus units, and number of contributing samples;
+- not replace `sample_balanced_median_enrichment_ratio` as the primary biological summary;
+- not be given a read-level P-value or treated as though millions of reads were millions of independent biological replicates;
+- not automatically become the later vdCHIBIN design reference without an explicit Stage 08/09 decision.
+
+No formal confidence interval is required for this pooled descriptive quantity. If a clustered sensitivity interval is ever added later, it must resample biological samples, not individual reads.
+
+---
+
+## 02.12 23-versus-24 enrichment-landscape comparison
+
+Only after the 23-nt and 24-nt enrichment landscapes have been independently reconstructed, compare them using matched terminal features.
+
+Each length has:
+
+```text
+4 terminal positions × 4 nucleotides = 16 matched features
+```
+
+For the canonical comparison, calculate Spearman rank correlation between the 23- and 24-nt **sample-balanced median enrichment ratios** for the same 16 features.
+
+At minimum report separately for:
+
+```text
+combined strand scope
+antisense strand scope
+```
+
+and separately for abundance and unique-sequence weighting.
+
+The antisense comparison is especially relevant to later guide-oriented design, but Stage 02 itself does not convert it into a candidate score.
+
+A pooled-abundance 23-vs-24 correlation may be reported descriptively if useful, but it is not required for the canonical Stage 02 result.
+
+Correlation measures similarity of the enrichment landscapes; it does not establish a shared enzyme or processing pathway.
+
+---
+
+## 02.13 QC/accounting
+
+Write a compact Stage 02 accounting table reporting at minimum:
+
+- samples represented;
+- primary-eligible sample-virus units;
+- observed read-level rows examined;
+- exact + assigned eligible 23/24 rows retained;
+- retained abundance and distinct-sequence totals by length and strand;
+- observed zero-signal populations;
+- observed length mismatches;
+- unexpected observed bases/categories;
+- number of background FASTA records examined;
+- number of fully supported 23-nt and 24-nt windows per sample-virus unit;
+- units with zero valid background windows;
+- excluded background windows containing masked/ambiguous sequence;
+- maximum deviation of valid observed A/C/G/T frequency sums from 1;
+- maximum deviation of valid expected A/C/G/T frequency sums from 1;
+- number of finite/non-finite pair-level enrichment values;
+- number of samples contributing to each canonical dataset-level feature;
+- total molecular abundance contributing to each pooled-abundance result.
+
+Masked `N` bases in background consensuses are expected and cause overlapping windows to be excluded. Unexpected non-ACGT bases in included observed RNA sequences are not silently accepted.
+
+---
+
+## 02.14 Required outputs
 
 ```text
 results/02_terminal_enrichment/
-    fixed_length_positional_nucleotides_by_pair.tsv
-    fixed_length_positional_nucleotides_across_samples.tsv
-    fixed_length_positional_nucleotides_across_pairs.tsv
-    ALL_VIRUSES_23nt_positional_nucleotide_ratios.tsv
-    ALL_VIRUSES_24nt_positional_nucleotide_ratios.tsv
-    ALL_VIRUSES_23nt_strand_specific_positional_nucleotide_ratios.tsv
-    ALL_VIRUSES_24nt_strand_specific_positional_nucleotide_ratios.tsv
-    23_vs_24_enrichment_correlations.tsv
-    figures/
+│
+├── qc/
+│   └── stage02_accounting.tsv
+│
+├── observed/
+│   └── terminal_observed_by_pair.tsv
+│
+├── background/
+│   └── terminal_expected_by_pair.tsv
+│
+├── enrichment/
+│   ├── terminal_enrichment_by_pair.tsv
+│   ├── terminal_enrichment_by_sample.tsv
+│   ├── terminal_enrichment_across_dataset.tsv
+│   └── terminal_enrichment_pooled_abundance.tsv
+│
+├── comparisons/
+│   └── enrichment_23_vs_24.tsv
+│
+└── figures/
 ```
 
-## Interpretation limit
+### `terminal_enrichment_across_dataset.tsv`
 
-This is an empirical sequence-enrichment measurement. It does not by itself identify whether the preference arose from Dicer cleavage, Argonaute loading, strand selection, RNA stability, library effects, or another process.
+Must include at minimum:
+
+```text
+length
+strand_scope
+weighting_mode
+terminal_position
+nucleotide
+sample_balanced_median_enrichment_ratio
+ci_low
+ci_high
+n_samples
+n_sample_virus_units
+pair_median_enrichment_ratio
+bootstrap_replicates_requested
+bootstrap_replicates_valid
+bootstrap_seed
+ci_method
+```
+
+### `terminal_enrichment_pooled_abundance.tsv`
+
+Must include at minimum:
+
+```text
+length
+strand_scope
+terminal_position
+nucleotide
+pooled_abundance_observed_fraction
+pooled_abundance_expected_fraction
+pooled_abundance_enrichment_ratio
+pooled_observed_total_weight
+n_samples
+n_sample_virus_units
+analysis_role = secondary_descriptive
+```
 
 ---
+
+## 02.15 Minimum figures
+
+Figures are generated only after numerical Stage 02 outputs have passed review.
+
+Minimum useful figures are:
+
+1. **Terminal-enrichment landscape** — clear 23-nt and 24-nt terminal-feature visualization, with abundance and unique-sequence views separated rather than overplotted.
+2. **23-vs-24 enrichment comparison** — matched 16-feature scatter for the canonical sample-balanced enrichment values, including the reported Spearman rho; antisense should be clearly available as a dedicated view.
+
+The pooled-abundance result does not require a separate figure unless it materially changes interpretation relative to the sample-balanced abundance result.
+
+Avoid redundant cosmetic variants.
+
+---
+
+## 02.16 Historical comparison rule
+
+Historical fixed-length terminal-enrichment outputs are **not inputs** to the canonical Stage 02 calculation.
+
+After the complete canonical Stage 02 outputs have been generated and interpreted, historical outputs may be read for regression comparison.
+
+Numerical comparisons are made only when eligibility, weighting, denominator, strand scope, background definition, and aggregation are genuinely comparable.
+
+If a historical quantity is pair-balanced while the canonical quantity is sample-balanced, label it **not directly comparable** rather than presenting a misleading numerical difference.
+
+A material discrepancy in directly comparable pair-level quantities must be investigated and documented; the canonical calculation must not be changed solely to force historical agreement.
+
+---
+
+## 02.17 Interpretation limits
+
+Stage 02 may establish observations such as:
+
+- a terminal nucleotide is enriched or depleted relative to matched viral sequence availability;
+- an enrichment is reproduced across biological samples;
+- the pattern persists or changes between abundance and unique-sequence weighting;
+- pooled molecular abundance emphasizes the same or a different terminal pattern;
+- 23- and 24-nt terminal landscapes are similar or different.
+
+Stage 02 must **not** by itself conclude that a preference was caused specifically by:
+
+```text
+Dicer cleavage
+Argonaute loading
+strand selection
+RdRP synthesis
+RNA stability
+```
+
+or that a terminal nucleotide guarantees RNAi efficacy.
+
+It is an empirical sequence-association layer. Mechanistic Dicer analysis begins in Stage 03, and candidate scoring is deliberately deferred to later vdCHIBIN stages.
+
+---
+
 
 # 03 — Official stepRNA Dicer-overhang analysis
 
@@ -1391,10 +1935,22 @@ Relevant software versions include Python, Snakemake, stepRNA, Bowtie2 used by s
 
 ### Stage 02
 
-- 5p1/5p2/3p2/3p1 extraction;
-- reverse-complement antisense expectation;
-- strand-weighted combined expectation;
-- zero expected frequency → `NA`.
+- exact 5p1/5p2/3p2/3p1 extraction;
+- observed antisense sequences are not reverse-complemented;
+- expected antisense windows are reverse-complemented correctly;
+- 23-nt and 24-nt window enumeration is inclusive and never crosses FASTA-record boundaries;
+- windows containing `N`/non-ACGT background sequence are excluded;
+- abundance mode uses read-level `count`, not row count;
+- unique-sequence mode uses the Stage 01 strand-specific sequence identity;
+- observed and expected A/C/G/T frequencies each sum to 1 when defined;
+- observed zero denominator → `NA`;
+- expected zero frequency → enrichment `NA`;
+- observed zero with positive expected frequency → enrichment 0;
+- strand-weighted combined expectation uses the observed mixture for the matching weighting mode;
+- sample-level median is taken across pair-level enrichment ratios, not as a ratio of separately aggregated frequencies;
+- sample-balanced median and sample-clustered bootstrap are reproducible with fixed seed;
+- pooled-abundance observed and abundance-matched expected fractions use the documented molecular weights;
+- pooled-abundance output remains separate from the canonical sample-balanced result.
 
 ### Stage 03–04
 

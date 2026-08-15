@@ -1,6 +1,6 @@
 # Varroa vsiRNA Metric Dictionary
 
-**Version:** 0.4  
+**Version:** 0.5  
 **Scope:** Canonical viral pipeline through viral spatial/transitivity-consistency analysis
 
 ---
@@ -335,7 +335,7 @@ Stage 01 emphasizes effect sizes and confidence intervals; it does not require P
 
 # 5. Terminal nucleotide coordinates
 
-Terminal positions are defined relative to the **physical sequenced RNA in its own 5′→3′ orientation**:
+Terminal positions are defined relative to the **physical RNA sequence in its own 5′→3′ orientation**:
 
 ```text
 5′ N1 N2 ................ N(n-1) Nn 3′
@@ -343,98 +343,425 @@ Terminal positions are defined relative to the **physical sequenced RNA in its o
  5p1 5p2                  3p2   3p1
 ```
 
-Antisense RNAs are therefore evaluated in antisense RNA orientation, not by simply reading the viral reference left-to-right.
+Canonical Stage 02 TSVs use the sequencing alphabet:
+
+```text
+A, C, G, T
+```
+
+where `T` corresponds biologically to uridine (`U`) in RNA.
+
+Observed antisense read sequences are already evaluated in their sequenced 5′→3′ orientation and are **not** reverse-complemented again. Expected antisense sequences are created by reverse-complementing reference-orientation viral windows and then evaluating the resulting antisense sequence 5′→3′.
 
 ---
 
 # 6. Terminal nucleotide enrichment
 
+## `observed_terminal_weight(b,p)`
+
+**Class:** Standard/descriptive
+
+Within one:
+
+```text
+sample × analysis_unit × length × strand × weighting_mode
+```
+
+this is the total observed weight of eligible RNAs carrying nucleotide `b ∈ {A,C,G,T}` at terminal position `p ∈ {5p1,5p2,3p2,3p1}`.
+
+Abundance mode uses the numeric read-level `count` field.
+
+Unique-sequence mode gives each distinct:
+
+```text
+sample × analysis_unit × length × strand × sequence
+```
+
+total observed weight 1.
+
+## `observed_total_weight`
+
+Total eligible observed weight in the same population.
+
 ## `observed_fraction(b,p)`
 
 **Class:** Standard/descriptive
 
-For nucleotide `b` at terminal position `p`:
-
 ```text
 observed_fraction(b,p)
-    = number/weight of eligible observed RNAs with b at p
-      / total number/weight of eligible observed RNAs
+    = observed_terminal_weight(b,p)
+      / observed_total_weight
 ```
 
-## `expected_fraction(b,p)`
+Range:
+
+```text
+0 to 1
+```
+
+If `observed_total_weight = 0`, report `NA`.
+
+For every valid population and terminal position:
+
+```text
+Σ_b observed_fraction(b,p) = 1
+```
+
+within numerical tolerance.
+
+Question answered:
+
+> Among the observed viral small-RNA population under the stated weighting mode, how common is nucleotide b at terminal position p?
+
+---
+
+## `valid_background_window_count(L)`
+
+**Class:** Project-specific matched-background accounting quantity
+
+For target length `L`, count all windows of length `L` that lie entirely within one FASTA record of the sample-specific depth-masked viral consensus and contain only:
+
+```text
+A, C, G, T
+```
+
+Windows containing `N` or another non-ACGT base are excluded. Windows never cross FASTA-record boundaries.
+
+Every valid genomic start position contributes one background opportunity; repeated identical sequence strings at different positions remain separate opportunities.
+
+---
+
+## `expected_fraction_sense(b,p)`
 
 **Class:** Project-specific matched-background quantity
 
-Frequency of nucleotide `b` at position `p` among all fully depth-supported windows of the **same RNA length** in the corresponding sample-specific viral background.
-
-- Sense expectation uses reference orientation.
-- Antisense expectation uses reverse-complement orientation.
-- Combined expectation uses the observed strand mixture rather than forcing a 50:50 mixture.
-
-Conceptually:
-
 ```text
-expected_combined
-    = wS × expected_sense
-      + wAS × expected_antisense
+expected_fraction_sense(b,p)
+    = number of fully supported reference-orientation windows
+      carrying nucleotide b at position p
+      / total fully supported windows of the same length
 ```
 
-with `wS + wAS = 1`.
+If no fully supported window exists, report `NA`.
 
-## `enrichment_ratio`
+## `expected_fraction_antisense(b,p)`
+
+For each fully supported reference window, first calculate its reverse complement and then read terminal position `p` in that antisense sequence's own 5′→3′ orientation:
+
+```text
+expected_fraction_antisense(b,p)
+    = number of fully supported reverse-complement windows
+      carrying nucleotide b at position p
+      / total fully supported windows of the same length
+```
+
+This is not obtained by simply relabelling reference ends; the reverse-complement transformation must be correct.
+
+For every valid expected population and position:
+
+```text
+Σ_b expected_fraction(b,p) = 1
+```
+
+within numerical tolerance.
+
+---
+
+## `observed_strand_weight_sense` and `observed_strand_weight_antisense`
+
+**Class:** Standard proportions used for matched combined expectation
+
+For one sample-virus × length × weighting mode:
+
+```text
+wS
+    = observed sense weight
+      / (observed sense weight + observed antisense weight)
+
+wAS
+    = observed antisense weight
+      / (observed sense weight + observed antisense weight)
+```
+
+When defined:
+
+```text
+wS + wAS = 1
+```
+
+The weights are calculated separately for abundance and unique-sequence modes because their observed strand mixtures may differ.
+
+---
+
+## `expected_fraction_combined(b,p)`
+
+**Class:** Project-specific strand-matched background quantity
+
+```text
+expected_fraction_combined(b,p)
+    = wS  × expected_fraction_sense(b,p)
+      + wAS × expected_fraction_antisense(b,p)
+```
+
+The combined expected background is therefore matched to the observed strand mixture and is **not** forced to 50:50.
+
+If the combined observed denominator is zero, report `NA`.
+
+---
+
+## `expected_fraction(b,p)`
+
+Generic field name for the matched expected frequency under the stated strand scope:
+
+```text
+sense     → expected_fraction_sense
+antisense → expected_fraction_antisense
+combined  → expected_fraction_combined
+```
+
+The background is a positional viral-sequence opportunity background. The same valid genomic windows are used for abundance and unique-sequence observed modes; the weighting modes differ on the observed side and, for combined scope, in the observed strand-mixture weights.
+
+---
+
+## `enrichment_ratio(b,p)`
 
 **Class:** Project-specific empirical effect size
 
+Within one sample-virus unit:
+
 ```text
-enrichment_ratio = observed_fraction / expected_fraction
+enrichment_ratio(b,p)
+    = observed_fraction(b,p)
+      / expected_fraction(b,p)
 ```
 
 Interpretation:
 
 ```text
-1   = observed as often as sequence availability predicts
+1   = observed as often as matched sequence availability predicts
 >1  = enriched
 <1  = depleted
+0   = not observed although expected frequency is positive
 ```
 
 If `expected_fraction = 0`, report `NA`.
 
-This metric does not identify which molecular process created the enrichment.
+If the observed population denominator is zero, report `NA`.
+
+No arbitrary pseudocount is added.
+
+The metric measures an empirical terminal sequence association; it does not identify the molecular mechanism that produced the association.
+
+---
 
 ## `pair_median_enrichment_ratio`
 
-**Class:** Project-specific historical/cross-pair summary
+**Class:** Project-specific pair-balanced / historical-regression summary
 
-Median `enrichment_ratio` across eligible sample-virus units.
+For a fixed:
 
-This corresponds most closely to the historical design-facing `median_enrichment_ratio` used in the project.
+```text
+length × strand_scope × weighting_mode × terminal_position × nucleotide
+```
+
+```text
+pair_median_enrichment_ratio
+    = median of finite enrichment_ratio values
+      across eligible sample-virus units
+```
+
+This corresponds most closely to the project's historical design-facing `median_enrichment_ratio` logic.
+
+It is not the canonical primary cross-dataset inference because several pair observations can come from the same biological sample.
+
+### Historical name `median_enrichment_ratio`
+
+If a historical-compatible output field is named exactly:
+
+```text
+median_enrichment_ratio
+```
+
+it is treated as an alias of the pair-balanced historical/regression quantity, **not** as an alias of the canonical sample-balanced result.
+
+This prevents old design references from being silently redefined.
+
+---
+
+## `sample_enrichment_median`
+
+**Class:** Canonical intermediate aggregation
+
+Within one sample, for a fixed terminal feature:
+
+```text
+sample_enrichment_median(sample)
+    = median of finite enrichment_ratio values
+      across that sample's eligible viruses
+```
+
+The median is taken over already abundance-weighted or unique-sequence-weighted **pair-level enrichment ratios**. Abundance information has therefore already entered the pair-level estimate before the sample balancing occurs.
+
+---
 
 ## `sample_balanced_median_enrichment_ratio`
 
-**Class:** Project-specific canonical summary
+**Class:** Project-specific canonical primary summary
 
-1. median enrichment across eligible viruses within each sample;
-2. median across sample-level medians.
+```text
+sample_balanced_median_enrichment_ratio
+    = median of sample_enrichment_median(sample)
+      across contributing biological samples
+```
 
-Use a sample-clustered bootstrap for its confidence interval.
+Equivalent procedure:
 
-Both pair- and sample-balanced fields should be exported so historical design references are not silently redefined.
+1. calculate matched enrichment per sample-virus;
+2. median across viruses within each sample;
+3. median across samples.
+
+This is explicitly **not**:
+
+```text
+median(observed_fraction) / median(expected_fraction)
+```
+
+and is not a pooled-read estimate.
+
+Question answered:
+
+> What terminal enrichment is typical across biological samples, while preventing deeper libraries or samples containing more viruses from automatically dominating the final estimate?
+
+Primary uncertainty uses `sample_clustered_CI95`.
+
+---
+
+## `pooled_abundance_observed_fraction(b,p)`
+
+**Class:** Project-specific secondary descriptive molecular-pool quantity
+
+Defined only for abundance weighting.
+
+For eligible sample-virus units `u` with defined matched backgrounds, let:
+
+```text
+N_u = total observed abundance in the stated length/strand scope
+O_u = observed abundance carrying nucleotide b at position p
+```
+
+Then:
+
+```text
+pooled_abundance_observed_fraction(b,p)
+    = Σ_u O_u / Σ_u N_u
+```
+
+This allows high-abundance/high-depth infections to contribute proportionally more molecular weight.
+
+---
+
+## `pooled_abundance_expected_fraction(b,p)`
+
+**Class:** Project-specific abundance-matched expected quantity
+
+Let `E_u = expected_fraction_u(b,p)` for the same unit and feature.
+
+```text
+pooled_abundance_expected_fraction(b,p)
+    = Σ_u (N_u × E_u) / Σ_u N_u
+```
+
+For combined scope, `E_u` is the abundance-mode strand-weighted combined expected fraction.
+
+This preserves each sample-virus unit's matched viral sequence composition while matching the overall expected background to the molecular abundance contributing to the pooled observed population.
+
+---
+
+## `pooled_abundance_enrichment_ratio(b,p)`
+
+**Class:** Project-specific secondary descriptive effect size
+
+```text
+pooled_abundance_enrichment_ratio(b,p)
+    = pooled_abundance_observed_fraction(b,p)
+      / pooled_abundance_expected_fraction(b,p)
+```
+
+If the pooled observed denominator is zero or the pooled expected fraction is zero, report `NA`.
+
+Question answered:
+
+> Across the total accumulated eligible molecular pool, what terminal enrichment is observed when molecular abundance is allowed to weight infections unequally?
+
+This is intentionally different from `sample_balanced_median_enrichment_ratio`.
+
+Interpretation rule:
+
+- useful secondary description of the accumulated molecular pool;
+- not an estimate of the typical biological sample;
+- no read-level P-value;
+- no automatic inferential confidence interval;
+- never treated as millions of independent biological replicates;
+- not automatically selected as the later vdCHIBIN design reference.
+
+The output must retain total contributing observed abundance, number of contributing sample-virus units, and number of contributing biological samples.
+
+---
 
 ## `spearman_rho_23_24`
 
-**Class:** Standard statistical metric
+**Class:** Standard statistical metric applied to canonical Stage 02 features
 
-Spearman rank correlation between matched 23- and 24-nt terminal enrichment landscapes.
+Spearman rank correlation between matched 23-nt and 24-nt terminal enrichment landscapes.
+
+Canonical input vector for each length consists of the same:
 
 ```text
-+1 = identical rank order
+4 terminal positions × 4 nucleotides = 16 features
+```
+
+using `sample_balanced_median_enrichment_ratio`.
+
+At minimum calculate separately for:
+
+```text
+combined strand scope
+antisense strand scope
+```
+
+and separately for abundance and unique-sequence weighting.
+
+Interpretation:
+
+```text
++1 = identical rank order of terminal enrichment features
  0 = no monotonic association
 -1 = opposite rank order
 ```
 
-This measures similarity of enrichment patterns, not shared enzymatic origin.
+This measures similarity of empirical enrichment patterns, not shared enzymatic origin.
 
 ---
+
+## Relationship between Stage 02 abundance and median aggregation
+
+The following quantities answer different levels of the biological question and must not be conflated:
+
+```text
+abundance weighting within sample-virus
+    → which terminal features dominate accumulated molecules in that infection
+
+sample-balanced median across biological samples
+    → whether that abundance-weighted preference is reproducible across infections
+
+pooled-abundance secondary summary
+    → which feature dominates the total sequenced molecular pool when deep/high-load infections receive more molecular weight
+```
+
+Thus using a median at the cross-sample level does **not** remove abundance information from the abundance-mode analysis; abundance has already determined each sample-virus enrichment ratio.
+
+---
+
 
 # 7. stepRNA geometry metrics
 
@@ -1235,11 +1562,21 @@ sample_clustered_CI95
 ## Empirical sequence metrics
 
 ```text
+observed_terminal_weight
+observed_total_weight
 observed_fraction
+valid_background_window_count
+expected_fraction_sense
+expected_fraction_antisense
+expected_fraction_combined
 expected_fraction
 enrichment_ratio
 pair_median_enrichment_ratio
+sample_enrichment_median
 sample_balanced_median_enrichment_ratio
+pooled_abundance_observed_fraction
+pooled_abundance_expected_fraction
+pooled_abundance_enrichment_ratio
 spearman_rho_23_24
 ```
 
