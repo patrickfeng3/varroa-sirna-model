@@ -1,6 +1,6 @@
 # Varroa vsiRNA Metric Dictionary
 
-**Version:** 0.7  
+**Version:** 0.8  
 **Scope:** Canonical viral pipeline through viral spatial/transitivity-consistency analysis
 
 ---
@@ -842,6 +842,80 @@ The 5′ and 3′ values must refer to the same reconstructed focal/passenger du
 
 ---
 
+## `steprna_joint_geometry`
+
+**Class:** Canonical pairing of published-method-derived quantities
+
+For one recovered focal/passenger duplex:
+
+```text
+steprna_joint_geometry
+    = (steprna_5p_distance, steprna_3p_distance)
+```
+
+Both distances must come from the **same official classified alignment**.
+
+Examples:
+
+```text
+(0,0)     fully blunt at both analysed ends
+(+2,-2)   pre-specified Varroa 2-nt joint geometry
+(0,-1)    blunt/flush at the 5′ marginal end, -1 at the 3′ end
+(-1,0)    -1 at the 5′ end, blunt/flush at the 3′ marginal end
+```
+
+This metric exists specifically to prevent marginal end-distance peaks from being misinterpreted as complete duplex geometry.
+
+## `joint_geometry_duplex_count(d5,d3)`
+
+**Class:** Canonical descriptive count
+
+Number of recovered focal/passenger duplex alignments in one Stage 03 run with exactly:
+
+```text
+steprna_5p_distance = d5
+steprna_3p_distance = d3
+```
+
+The counts across all observed `(d5,d3)` combinations must sum exactly to `n_recovered_duplexes`.
+
+## `joint_duplex_fraction(d5,d3)`
+
+**Class:** Canonical descriptive metric
+
+```text
+joint_duplex_fraction(d5,d3)
+    = joint_geometry_duplex_count(d5,d3)
+      / n_recovered_duplexes
+```
+
+For every non-empty run:
+
+```text
+Σ joint_duplex_fraction(d5,d3) = 1
+```
+
+within numerical precision.
+
+If no duplex is recovered, report `NA`.
+
+## `joint_00_duplex_fraction`
+
+**Class:** Canonical named special case
+
+```text
+joint_00_duplex_fraction
+    = joint_duplex_fraction(0,0)
+```
+
+Interpretation:
+
+> Fraction of reconstructed duplex relationships that are simultaneously distance `0` at both analysed ends.
+
+This must **not** be inferred from the marginal 5′ and 3′ distance-0 frequencies.
+
+---
+
 ## `steprna_official_duplex_count`
 
 **Class:** Published-method-derived/native software output
@@ -1094,9 +1168,11 @@ Interpretation:
 
 ## Full-spectrum versus joint-geometry rule
 
-The **full signed 5′ and 3′ distance spectra are primary Stage 03 outputs**.
+The **full signed marginal 5′ and 3′ distance spectra and the full same-duplex `(d5,d3)` spectrum are complementary canonical Stage 03 outputs**.
 
-`varroa_2nt_joint_geometry` is a pre-specified secondary feature of interest inside that full landscape.
+A strong marginal peak at distance `0` does not imply that `(0,0)` is common in the same duplex. The joint spectrum must be consulted before using words such as “fully blunt duplex.”
+
+`varroa_2nt_joint_geometry` is a pre-specified secondary feature of interest inside the full same-duplex landscape.
 
 A strong +2/−2 result must not cause other reproducibly enriched distances to be discarded, and a different dominant distance must not be relabelled +2/−2 after the fact.
 
@@ -1176,6 +1252,83 @@ If reported, this is the median-across-viruses then median-across-samples summar
 It is **descriptive only**.
 
 Do not interpret it as a newly derived population-level Wald test, and do not derive a population P-value from it.
+
+---
+
+## `sample_balanced_joint_duplex_fraction(d5,d3)`
+
+**Class:** Canonical same-duplex geometry aggregation
+
+For each fixed focal length, focal strand, and same-duplex geometry `(d5,d3)`:
+
+```text
+pair-level joint_duplex_fraction(d5,d3)
+→ median across viruses within sample
+→ median across samples
+```
+
+with sample-clustered percentile bootstrap 95% CI.
+
+This is the primary cross-dataset estimator for the prevalence of a specific **complete same-duplex geometry**.
+
+## `sample_balanced_joint_00_duplex_fraction`
+
+**Class:** Canonical named special case
+
+```text
+sample_balanced_joint_00_duplex_fraction
+    = sample_balanced_joint_duplex_fraction(0,0)
+```
+
+This measures fully blunt reconstructed duplex relationships and is distinct from the sample-balanced marginal distance-0 log-ratio.
+
+## `joint_geometry_mode_by_pair`
+
+**Class:** Canonical descriptive
+
+The `(d5,d3)` combination with the largest `joint_geometry_duplex_count` within one sample-virus/focal-class run.
+
+A mode is the single most common category; it does not imply a majority.
+
+Ties must be represented deterministically and transparently rather than silently broken as biological evidence.
+
+## `joint_00_is_mode`
+
+**Class:** Canonical descriptive indicator
+
+```text
+1 if (0,0) is a joint-geometry mode in the run
+0 otherwise
+```
+
+Used to count how often fully blunt geometry is the most common complete geometry across sample-virus runs.
+
+## `joint_00_majority`
+
+**Class:** Canonical descriptive indicator
+
+```text
+1 if joint_00_duplex_fraction > 0.5
+0 otherwise
+```
+
+This directly answers whether most reconstructed duplexes in a run are fully blunt.
+
+In the validated current dataset this is `0/54` for all four focal classes.
+
+## `pooled_joint_duplex_fraction(d5,d3)`
+
+**Class:** Secondary descriptive
+
+```text
+Σ joint_geometry_duplex_count(d5,d3)
+/
+Σ n_recovered_duplexes
+```
+
+across the selected sample-virus units.
+
+This is useful for intuitive reporting but is not the primary biological estimator because high-depth runs contribute more duplex relationships.
 
 ---
 
@@ -1301,7 +1454,7 @@ Written historically as `Δ_Dicer`.
 
 The earlier Varroa pipeline defined a project-specific statistic contrasting support at a pre-specified Dicer-like overhang feature against support at other tested distances and assessed it using a custom permutation framework.
 
-The canonical v0.7 project does **not** assign a new formula to this historical name from memory or from the new stepRNA output.
+The canonical v0.8 project does **not** assign a new formula to this historical name from memory or from the new stepRNA output.
 
 It may be reproduced only from the exact archived v1.4.0 implementation/configuration, preserving:
 
@@ -2205,6 +2358,9 @@ steprna_wald_z
 
 ```text
 sample_balanced_steprna_log_ratio
+sample_balanced_joint_duplex_fraction(d5,d3)
+sample_balanced_joint_00_duplex_fraction
+joint_geometry_mode_by_pair
 paired_delta_24_minus_23(M)
 sample_balanced_varroa_2nt_joint_duplex_fraction
 sample_balanced_varroa_2nt_reference_fraction_recovered
@@ -2270,27 +2426,61 @@ are highly concordant, with recurring features including
 
 Stage 03
 official stepRNA reconstructs complementary passengers in all
-four focal classes; the full end-distance landscape is dominated
-by blunt/near-blunt geometry rather than by the pre-specified
-(+2,-2) joint geometry. The marginal 3p -2 component is present,
-but the full (+2,-2) configuration is a minority duplex geometry.
+four focal classes. Distance 0 is a prominent marginal end-distance,
+especially in antisense populations, but the new same-duplex spectrum
+shows that fully blunt (0,0) duplexes are only a minority.
+
+The pre-specified (+2,-2) geometry is also a minority same-duplex
+feature. A marginal 3p -2 component is reproducibly represented,
+especially in antisense populations, while the matching 5p +2
+component is substantially weaker.
+
+Stage 04
+sample-aware aggregation confirms that these findings are broadly
+reproducible across the dataset rather than being explained by one
+outlier sample. Sample-balanced fully blunt (0,0) fractions are
+approximately 2.15% (23S), 9.31% (23AS), 2.27% (24S), and 3.11%
+(24AS), with 0/54 runs in every focal class having >50% (0,0).
+
+Sample-balanced (+2,-2) fractions are approximately 1.53% (23S),
+2.00% (23AS), 1.98% (24S), and 0.58% (24AS). In antisense
+populations, (+2,-2) support is reproducibly greater for 23 nt than
+for 24 nt, but this difference is not sufficient to classify the two
+length classes as primary/Dicer versus secondary/RdRP products.
+
+Geometry-conditioned terminal sequence effects exist, but are not
+consistently strong across abundance and unique-sequence weighting
+and partly overlap the general Stage 02 terminal-enrichment landscape.
+A separate geometry/Dicer ranking feature is therefore not carried
+forward into vdCHIBIN candidate ranking.
 ```
 
 Therefore the canonical project must **not currently describe 23 nt as proven primary/Dicer products or 24 nt as proven secondary/RdRP products**.
 
-Stage 04 is explicitly responsible for sample-aware geometry inference, matched 23-versus-24 comparison, and determining whether the pre-specified joint-geometry subset carries terminal sequence information beyond the general and passenger-recovered populations.
+The joint-geometry result also requires a strict distinction between:
+
+```text
+marginal distance 0
+    ≠
+fully blunt same-duplex (0,0)
+```
 
 The pipeline must never simplify the evidence to:
 
 ```text
 all 23-mers = Dicer/primary
-all 24-mers = secondary
+all 24-mers = secondary/RdRP
 24-mers = Dicer-independent
+marginal distance 0 = fully blunt duplex
 blunt geometry = non-Dicer
 (+2,-2) = a universal Dicer definition
+the current geometry distribution is sufficient to classify Dicer vs RdRP origin
+geometry-conditioned sequence preference = an independent ranking score
 ```
 
-Natural viral infection also creates structured complementary RNA substrates, and small-RNA libraries introduce recoverability and library-preparation constraints. Mechanistic language must therefore remain proportional to the evidence.
+Natural viral infection creates structured complementary RNA substrates, while passenger stability, post-cleavage processing, library preparation, and sequence recoverability can alter the sequenced population. stepRNA reconstructs compatible focal/passenger relationships from independently sequenced RNAs; it does not directly observe the original physical cleavage event.
+
+Stage 05 may add independent evidence about viral spatial/transitivity behaviour, but it must not retroactively turn Stage 03/04 geometry into a pathway assignment that those stages do not support.
 
 ---
 

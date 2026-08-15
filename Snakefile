@@ -12,6 +12,7 @@ include: "workflow/rules/validate_legacy_core.smk"
 include: "workflow/rules/stage01.smk"
 include: "workflow/rules/stage02.smk"
 include: "workflow/rules/stage03.smk"
+include: "workflow/rules/stage04.smk"
 
 
 rule all:
@@ -45,3 +46,22 @@ rule all:
         "results/03_steprna/parsed/passenger_length_by_pair.tsv",
         "results/03_steprna/parsed/joint_geometry_by_pair.tsv",
         "results/03_steprna/parsed/joint_geometry_references.tsv.gz",
+        "results/03_steprna/parsed/joint_geometry_spectrum_by_pair.tsv",
+        "results/03_steprna/qc/stage03_joint_geometry_spectrum_accounting.tsv",
+        "results/04_duplex_geometry/qc/stage04_accounting.tsv",
+        "results/04_duplex_geometry/population/full_spectrum_by_sample.tsv",
+        "results/04_duplex_geometry/population/full_spectrum_across_dataset.tsv",
+        "results/04_duplex_geometry/population/passenger_recovery_across_dataset.tsv",
+        "results/04_duplex_geometry/population/joint_geometry_by_sample.tsv",
+        "results/04_duplex_geometry/population/joint_geometry_across_dataset.tsv",
+        "results/04_duplex_geometry/comparisons/paired_23_vs_24.tsv",
+        "results/04_duplex_geometry/sequence_features/geometry_terminal_by_pair.tsv",
+        "results/04_duplex_geometry/sequence_features/geometry_terminal_by_sample.tsv",
+        "results/04_duplex_geometry/sequence_features/geometry_terminal_across_dataset.tsv",
+        "results/04_duplex_geometry/sequence_features/geometry_specific_contrasts.tsv",
+        "results/04_duplex_geometry/sequence_features/redundancy.tsv",
+        "results/04_duplex_geometry/population/joint_geometry_spectrum_by_sample.tsv",
+        "results/04_duplex_geometry/population/joint_geometry_spectrum_across_dataset.tsv",
+        "results/04_duplex_geometry/population/joint_geometry_mode_by_pair.tsv",
+        "results/04_duplex_geometry/population/joint_geometry_spectrum_summary.tsv",
+        "results/04_duplex_geometry/qc/stage04_joint_geometry_spectrum_accounting.tsv",

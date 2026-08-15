@@ -27,3 +27,21 @@ rule stage03_official_steprna:
     shell:
         "python {input.script:q} --legacy-core {params.legacy_core:q} "
         "--config {input.analysis_config:q} --output-root {params.output_root:q}"
+
+
+rule stage03_joint_geometry_spectrum:
+    input:
+        script="workflow/scripts/stage03_joint_spectrum.py",
+        library="workflow/scripts/stage03.py",
+        run_manifest=f"{STAGE03_ROOT}/provenance/run_manifest.tsv",
+        prespecified_joint=f"{STAGE03_ROOT}/parsed/joint_geometry_by_pair.tsv",
+    output:
+        spectrum=f"{STAGE03_ROOT}/parsed/joint_geometry_spectrum_by_pair.tsv",
+        accounting=f"{STAGE03_ROOT}/qc/stage03_joint_geometry_spectrum_accounting.tsv",
+    params:
+        stage03_root=STAGE03_ROOT,
+    conda:
+        "../envs/stage03.yaml"
+    shell:
+        "python {input.script:q} --stage03-root {params.stage03_root:q} "
+        "--output {output.spectrum:q} --qc-output {output.accounting:q}"
