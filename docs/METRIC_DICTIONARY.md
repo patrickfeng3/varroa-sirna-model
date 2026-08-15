@@ -1,6 +1,6 @@
 # Varroa vsiRNA Metric Dictionary
 
-**Version:** 0.6  
+**Version:** 0.7  
 **Scope:** Canonical viral pipeline through viral spatial/transitivity-consistency analysis
 
 ---
@@ -1119,79 +1119,435 @@ Abundance weighting uses `focal_abundance` derived from the canonical read-level
 ---
 
 
-# 9. `delta_dicer`
+# 9. Stage 04 sample-aware duplex-geometry metrics
 
-Written `Δ_Dicer`.
+## `sample_steprna_log_ratio_median`
 
-**Class:** Project-specific secondary statistic
+**Class:** Canonical aggregation of a published-method-derived metric
 
-For pre-specified target distance `d*` and pre-specified comparison set `D0`:
+For one fixed:
 
 ```text
-Δ_Dicer
-    = support(d*)
-      - mean[support(d) for d in D0]
+sample
+× focal_length
+× focal_strand
+× end
+× signed_distance
+× official_view
 ```
 
-`D0` must be defined before examining the result.
+```text
+sample_steprna_log_ratio_median
+    = median of finite official stepRNA log-ratios
+      across eligible sample-virus units within that sample
+```
+
+`official_view` is one of:
+
+```text
+duplex
+unique_reference
+```
+
+Purpose: prevent a sequencing library containing several eligible viruses from automatically contributing several independent biological votes.
+
+## `sample_balanced_steprna_log_ratio`
+
+**Class:** Canonical
+
+```text
+sample_balanced_steprna_log_ratio
+    = median across contributing samples of
+      sample_steprna_log_ratio_median
+```
+
+Primary uncertainty is the canonical sample-clustered percentile bootstrap 95% CI.
+
+This is the preferred cross-dataset effect summary for the full official stepRNA distance spectrum.
+
+It is not an official stepRNA statistic itself; it is a canonical aggregation of official stepRNA per-run log-ratios.
+
+## `sample_balanced_steprna_wald_z_descriptive`
+
+**Class:** Canonical descriptive aggregation of a published-method-derived statistic
+
+If reported, this is the median-across-viruses then median-across-samples summary of official per-run Wald Z values.
+
+It is **descriptive only**.
+
+Do not interpret it as a newly derived population-level Wald test, and do not derive a population P-value from it.
+
+---
+
+## `paired_delta_24_minus_23(M)`
+
+**Class:** Canonical paired effect size
+
+For the same:
+
+```text
+sample
+analysis_unit
+focal_strand
+```
+
+and the same metric definition `M`:
+
+```text
+paired_delta_24_minus_23(M)
+    = M_24 - M_23
+```
+
+Examples include:
+
+```text
+paired_delta_24_minus_23(varroa_2nt_reference_fraction_recovered)
+paired_delta_24_minus_23(sample-virus official 3p -2 log-ratio)
+```
+
+Canonical dataset aggregation:
+
+```text
+pair-level 24-minus-23 difference
+→ median across viruses within sample
+→ median across samples
+```
+
+with sample-clustered bootstrap 95% CI.
+
+Positive values mean the specified metric is larger for 24 nt; negative values mean it is larger for 23 nt.
+
+Sense and antisense focal-strand comparisons are kept separate.
+
+---
+
+## `sample_balanced_passenger_recovery_fraction_unique`
+
+**Class:** Canonical descriptive
+
+Sample-balanced summary of Stage 03 `passenger_recovery_fraction_unique`.
+
+Passenger recovery measures observability of complementary partners, not Dicer activity.
+
+## `sample_balanced_passenger_recovery_fraction_abundance`
+
+**Class:** Canonical descriptive
+
+Sample-balanced summary of Stage 03 `passenger_recovery_fraction_abundance`.
+
+---
+
+## `sample_balanced_varroa_2nt_joint_duplex_fraction`
+
+**Class:** Canonical descriptive
+
+Sample-balanced summary of the Stage 03 duplex-level `varroa_2nt_joint_duplex_fraction`.
+
+This remains distinct from focal-reference support.
+
+## `sample_balanced_varroa_2nt_reference_fraction_recovered`
+
+**Class:** Canonical project-specific geometry-support metric
+
+Sample-balanced summary of:
+
+```text
+n_focal_references_supporting_joint_geometry
+/ n_recovered_focal_references
+```
+
+This is the preferred unique-reference joint-support view because it conditions on a passenger having been recoverable.
+
+## `sample_balanced_varroa_2nt_reference_fraction_abundance_recovered`
+
+**Class:** Canonical project-specific geometry-support metric
+
+Sample-balanced summary of the abundance-weighted recovered-reference joint-support fraction.
+
+This uses upstream `focal_abundance`, not passenger-alignment multiplicity.
+
+---
+
+## `pair_balanced_geometry_summary`
+
+**Class:** Secondary descriptive/sensitivity aggregation
+
+Median across sample-virus units for a fixed geometry metric.
+
+Useful for regression with historical pair-balanced analyses but not the primary cross-dataset estimator.
+
+## `virus_balanced_geometry_summary`
+
+**Class:** Secondary sensitivity aggregation
+
+For a fixed geometry metric:
+
+```text
+median across samples within biological_virus
+→ median across biological viruses
+```
+
+This asks whether a result is broadly shared across virus identities rather than dominated by a repeatedly observed virus.
+
+---
+
+## 9A. Historical custom `Δ_Dicer`
+
+## `historical_delta_dicer`
+
+Written historically as `Δ_Dicer`.
+
+**Class:** Historical regression-only metric
+
+The earlier Varroa pipeline defined a project-specific statistic contrasting support at a pre-specified Dicer-like overhang feature against support at other tested distances and assessed it using a custom permutation framework.
+
+The canonical v0.7 project does **not** assign a new formula to this historical name from memory or from the new stepRNA output.
+
+It may be reproduced only from the exact archived v1.4.0 implementation/configuration, preserving:
+
+- target geometry/distance definition;
+- comparison-distance set;
+- support definition;
+- weighting mode;
+- aggregation;
+- permutation/null construction;
+- random seed and replicate count when recorded.
+
+If the exact definition is unavailable:
+
+```text
+historical_delta_dicer = NA
+historical_delta_dicer_status = exact_definition_unavailable
+```
+
+Do not invent `D0` or substitute the official stepRNA log-ratio.
+
+This metric is not a candidate-window score and is not part of the primary canonical Stage 04 inference.
+
+---
+
+# 10. Stage 04 geometry-conditioned terminal sequence metrics
+
+The canonical names use **geometry** rather than **Dicer** because the subset is defined by reconstructed stepRNA geometry, not direct biochemical assignment to a nuclease.
+
+## `joint_observed_fraction(f)`
+
+**Class:** Canonical descriptive
+
+For terminal feature `f` within one sample-virus × focal-length × focal-strand × weighting-mode unit:
+
+```text
+joint_observed_fraction(f)
+    = weighted frequency of f among focal references
+      supporting the pre-specified (+2,-2) joint geometry
+```
+
+Unique-sequence mode gives each distinct focal reference sequence weight 1.
+
+Abundance mode weights each focal reference by upstream `focal_abundance`.
+
+Do not weight by passenger multiplicity.
+
+If no joint-supporting focal reference exists, report `NA`.
+
+## `recovered_observed_fraction(f)`
+
+**Class:** Canonical descriptive/control quantity
+
+```text
+recovered_observed_fraction(f)
+    = weighted frequency of f among all focal references
+      with at least one recovered passenger
+```
+
+This provides the passenger-recovery-conditioned comparison population.
+
+## `E_joint_absolute(f)`
+
+**Class:** Canonical exploratory/candidate-development metric
+
+```text
+E_joint_absolute(f)
+    = joint_observed_fraction(f)
+      / Stage02_expected_fraction(f)
+```
+
+The expected fraction must be the exact matching Stage 02 pair-level viral background for the same:
+
+```text
+sample × analysis_unit × focal_length × focal_strand
+× terminal_position × nucleotide
+```
+
+Interpretation:
+
+> Absolute enrichment of feature `f` among focal RNAs supporting the pre-specified joint geometry relative to matched viral sequence opportunity.
+
+If the subset is empty or the expected fraction is zero/undefined, report `NA`.
+
+No pseudocount.
+
+## `E_recovered_absolute(f)`
+
+**Class:** Canonical control metric
+
+```text
+E_recovered_absolute(f)
+    = recovered_observed_fraction(f)
+      / Stage02_expected_fraction(f)
+```
+
+This measures terminal enrichment among all passenger-recovered focal RNAs.
+
+## `E_all(f)`
+
+**Class:** Canonical upstream metric reference
+
+The exact matching Stage 02 pair-level `enrichment_ratio` for all observed focal RNAs of the same sample-virus × length × strand × weighting mode × terminal feature.
+
+Do not substitute the Stage 02 across-dataset median when calculating a pair-level contrast.
+
+---
+
+## `joint_vs_all_log2_contrast(f)`
+
+**Class:** Canonical exploratory/candidate-development metric
+
+```text
+joint_vs_all_log2_contrast(f)
+    = log2(E_joint_absolute(f) / E_all(f))
+```
 
 Interpretation:
 
 ```text
-≈0 = target geometry does not stand out
->0 = target geometry exceeds the comparison distances
+0  = joint-supporting subset resembles the overall observed enrichment
+>0 = relatively more enriched in the joint-supporting subset
+<0 = relatively less enriched in the joint-supporting subset
 ```
 
-This is not an official stepRNA statistic and is not directly a candidate-window score.
+If either required enrichment is non-positive or undefined, report `NA`.
 
----
+No pseudocount.
 
-# 10. Dicer-conditioned sequence metrics
+## `joint_vs_recovered_log2_contrast(f)`
 
-## `E_Dicer_absolute(f)`
-
-**Class:** Project-specific exploratory/candidate-development metric
+**Class:** Canonical preferred geometry-specific sequence contrast
 
 ```text
-E_Dicer_absolute(f)
-    = frequency of feature f among the pre-specified Dicer-supported subset
-      / matched viral-sequence expected frequency of f
+joint_vs_recovered_log2_contrast(f)
+    = log2(E_joint_absolute(f) / E_recovered_absolute(f))
 ```
 
-The background must be matched by sample, virus, length, and strand.
-
-## `E_all_observed(f)`
-
-General matched enrichment for feature `f` from Stage 02.
-
-## `dicer_specific_log2_contrast(f)`
-
-**Class:** Project-specific exploratory/candidate-development metric
+When the same background is defined in numerator and denominator:
 
 ```text
-dicer_specific_log2_contrast(f)
-    = log2(E_Dicer_absolute(f) / E_all_observed(f))
+= log2(joint_observed_fraction(f)
+       / recovered_observed_fraction(f))
 ```
 
 Interpretation:
 
-```text
-0  = Dicer-supported subset adds little beyond general enrichment
->0 = feature is more enriched in Dicer-supported RNAs
-<0 = feature is less enriched in Dicer-supported RNAs
-```
+> Conditional on a complementary passenger being recoverable, is feature `f` relatively more or less represented among focal sequences supporting the pre-specified (+2,-2) geometry?
 
-If the required ratio is undefined or non-positive, report `NA`; do not add an arbitrary pseudocount solely to force a finite logarithm.
+This reduces confounding by passenger recoverability and is preferred over `joint_vs_all_log2_contrast` when asking whether the terminal feature is specifically associated with the reconstructed joint geometry.
 
-## `dicer_general_correlation`
+It does not eliminate every possible sequencing/selection bias.
 
-**Class:** Standard correlation applied to project metrics
-
-Correlation between general terminal enrichment and Dicer-conditioned enrichment.
-
-Purpose: detect redundancy before any Dicer-derived feature is considered for later sequence ranking.
+If a required quantity is zero or undefined, report `NA`; no pseudocount.
 
 ---
+
+## `sample_balanced_E_joint_absolute(f)`
+
+**Class:** Canonical aggregation
+
+For each fixed terminal feature and analysis stratum:
+
+```text
+pair-level E_joint_absolute
+→ median across viruses within sample
+→ median across samples
+```
+
+with sample-clustered bootstrap 95% CI.
+
+## `sample_balanced_joint_vs_all_log2_contrast(f)`
+
+**Class:** Canonical aggregation
+
+Sample-balanced median of pair-level `joint_vs_all_log2_contrast(f)` with sample-clustered bootstrap 95% CI.
+
+## `sample_balanced_joint_vs_recovered_log2_contrast(f)`
+
+**Class:** Canonical aggregation
+
+Sample-balanced median of pair-level `joint_vs_recovered_log2_contrast(f)` with sample-clustered bootstrap 95% CI.
+
+This is the primary terminal-sequence effect estimate for assessing geometry-specific information beyond passenger recoverability.
+
+---
+
+## `rho_joint_vs_general`
+
+**Class:** Standard Spearman correlation applied descriptively to canonical metrics
+
+Across the 16 matched terminal features for one focal length × focal strand × weighting mode:
+
+```text
+rho_joint_vs_general
+    = Spearman rho(
+        sample_balanced_E_joint_absolute,
+        matching Stage 02 sample-balanced enrichment
+      )
+```
+
+Purpose: quantify redundancy between the absolute joint-geometry enrichment landscape and the general Stage 02 terminal-enrichment landscape.
+
+A high positive rho suggests the two landscapes have similar rank structure; it does not prove identical biological mechanism.
+
+No formal correlation P-value is required for the canonical use.
+
+## `rho_joint_contrast_abundance_vs_unique`
+
+**Class:** Standard descriptive correlation
+
+Across the same 16 terminal features:
+
+```text
+rho_joint_contrast_abundance_vs_unique
+    = Spearman rho(
+        sample_balanced_joint_vs_recovered_log2_contrast_abundance,
+        sample_balanced_joint_vs_recovered_log2_contrast_unique
+      )
+```
+
+Purpose: assess whether the geometry-specific terminal pattern is concordant between accumulated molecules and distinct sequence diversity.
+
+---
+
+## Deprecated pre-v0.7 names
+
+The following names are deprecated before Stage 04 implementation because they imply stronger mechanistic assignment than the data justify:
+
+```text
+E_Dicer_absolute
+dicer_specific_log2_contrast
+dicer_general_correlation
+```
+
+They must not be used in new canonical output schemas.
+
+Historical documents containing those names remain valid records of earlier planning, but the v0.7 canonical replacements are:
+
+```text
+E_joint_absolute
+joint_vs_all_log2_contrast / joint_vs_recovered_log2_contrast
+rho_joint_vs_general
+```
+
+---
+
 
 # 11. Stage-05 coordinate and track metrics
 
@@ -1833,35 +2189,50 @@ pooled_abundance_enrichment_ratio
 spearman_rho_23_24
 ```
 
-## Published Dicer-analysis metrics
+## Published duplex-geometry analysis metrics
 
 ```text
 steprna_5p_distance
 steprna_3p_distance
 passenger_length
-passenger_recovery_fraction
-installed stepRNA enrichment/log-ratio output
+passenger_recovery_fraction_unique
+passenger_recovery_fraction_abundance
+steprna_log_ratio
 steprna_wald_z
 ```
 
-## Project-specific Dicer summaries
+## Canonical Stage 04 population summaries
 
 ```text
-varroa_2nt_joint_geometry
-varroa_2nt_fraction_all_refs
-varroa_2nt_fraction_recovered
-Δ_Dicer
+sample_balanced_steprna_log_ratio
+paired_delta_24_minus_23(M)
+sample_balanced_varroa_2nt_joint_duplex_fraction
+sample_balanced_varroa_2nt_reference_fraction_recovered
+sample_balanced_varroa_2nt_reference_fraction_abundance_recovered
+pair_balanced_geometry_summary
+virus_balanced_geometry_summary
 ```
 
-## Potential Dicer-derived candidate features
+## Historical regression-only geometry statistic
 
 ```text
-E_Dicer_absolute
-dicer_specific_log2_contrast
-dicer_general_correlation
+historical_delta_dicer
 ```
 
-These remain exploratory until reproducibility and non-redundancy are demonstrated.
+## Geometry-conditioned sequence metrics
+
+```text
+joint_observed_fraction
+recovered_observed_fraction
+E_joint_absolute
+E_recovered_absolute
+joint_vs_all_log2_contrast
+joint_vs_recovered_log2_contrast
+rho_joint_vs_general
+rho_joint_contrast_abundance_vs_unique
+```
+
+These sequence metrics remain exploratory/candidate-development quantities. Stage 04 does not automatically turn them into a candidate-scoring dimension.
 
 ## Project-specific spatial/transitivity metrics
 
@@ -1883,30 +2254,46 @@ lag_asymmetry_AS_minus_S
 
 # 28. Current biological interpretation
 
-The working population-level model is:
+The clean canonical pipeline has established, in sequence:
 
 ```text
-23 nt
-→ more strongly associated with the primary/Dicer-like response
+Stage 01
+24 nt is the dominant 15–35-nt viral small-RNA length class;
+23 nt is the second most prominent;
+both are strongly antisense-biased;
+24 nt is more strongly antisense-biased.
 
-24 nt antisense
-→ associated with a later/secondary-like population
-→ while still showing evidence compatible with Dicer/Dicer-like processing
+Stage 02
+23- and 24-nt terminal nucleotide-enrichment landscapes
+are highly concordant, with recurring features including
+3p1 T/U enrichment and depletion of 5p1 G, 3p1 A and 3p2 A.
+
+Stage 03
+official stepRNA reconstructs complementary passengers in all
+four focal classes; the full end-distance landscape is dominated
+by blunt/near-blunt geometry rather than by the pre-specified
+(+2,-2) joint geometry. The marginal 3p -2 component is present,
+but the full (+2,-2) configuration is a minority duplex geometry.
 ```
 
-These are population associations, not identities.
+Therefore the canonical project must **not currently describe 23 nt as proven primary/Dicer products or 24 nt as proven secondary/RdRP products**.
 
-The pipeline must never simplify this to:
+Stage 04 is explicitly responsible for sample-aware geometry inference, matched 23-versus-24 comparison, and determining whether the pre-specified joint-geometry subset carries terminal sequence information beyond the general and passenger-recovered populations.
+
+The pipeline must never simplify the evidence to:
 
 ```text
-all 23-mers = primary
+all 23-mers = Dicer/primary
 all 24-mers = secondary
 24-mers = Dicer-independent
+blunt geometry = non-Dicer
+(+2,-2) = a universal Dicer definition
 ```
 
-Natural viral infection also creates its own spatially structured RNA substrates, so Stage 05 provides evidence **consistent with** secondary/transitive biology rather than direct mechanistic proof.
+Natural viral infection also creates structured complementary RNA substrates, and small-RNA libraries introduce recoverability and library-preparation constraints. Mechanistic language must therefore remain proportional to the evidence.
 
 ---
+
 
 # 29. Metrics deliberately not yet defined
 
@@ -1916,7 +2303,7 @@ Do not create these until later analyses justify them:
 S23_primary
 S24_secondary
 overall vdCHIBIN window score
-Dicer-compatibility ranking weight
+duplex-geometry compatibility ranking weight
 transitivity kernel K(d)
 construct-level secondary score
 ```

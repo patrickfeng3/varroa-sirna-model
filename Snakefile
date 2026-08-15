@@ -11,6 +11,7 @@ else:
 include: "workflow/rules/validate_legacy_core.smk"
 include: "workflow/rules/stage01.smk"
 include: "workflow/rules/stage02.smk"
+include: "workflow/rules/stage03.smk"
 
 
 rule all:
@@ -33,3 +34,14 @@ rule all:
         "results/02_terminal_enrichment/enrichment/terminal_enrichment_across_dataset.tsv",
         "results/02_terminal_enrichment/enrichment/terminal_enrichment_pooled_abundance.tsv",
         "results/02_terminal_enrichment/comparisons/enrichment_23_vs_24.tsv",
+        "results/03_steprna/qc/stage03_accounting.tsv",
+        "results/03_steprna/provenance/software_versions.tsv",
+        "results/03_steprna/provenance/run_manifest.tsv",
+        "results/03_steprna/inputs/input_manifest.tsv",
+        "results/03_steprna/inputs/focal_reference_manifest.tsv.gz",
+        "results/03_steprna/inputs/passenger_manifest.tsv.gz",
+        "results/03_steprna/parsed/passenger_recovery_by_pair.tsv",
+        "results/03_steprna/parsed/overhang_spectrum_by_pair.tsv",
+        "results/03_steprna/parsed/passenger_length_by_pair.tsv",
+        "results/03_steprna/parsed/joint_geometry_by_pair.tsv",
+        "results/03_steprna/parsed/joint_geometry_references.tsv.gz",
