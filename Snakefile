@@ -14,6 +14,7 @@ include: "workflow/rules/stage02.smk"
 include: "workflow/rules/stage03.smk"
 include: "workflow/rules/stage04.smk"
 include: "workflow/rules/stage05.smk"
+include: "workflow/rules/stage06.smk"
 
 
 rule all:
@@ -82,3 +83,7 @@ rule all:
         "results/05_viral_transitivity/canonical_transitivity_analysis/leave_one_virus_out.tsv",
         "results/05_viral_transitivity/canonical_transitivity_analysis/multiple_testing_summary.tsv",
         "results/05_viral_transitivity/canonical_transitivity_analysis/final_transitivity_summary.tsv",
+        "results/06_targets/target_reference_summary.tsv",
+        "results/06_targets/target_candidates.tsv",
+        "results/06_targets/qc/stage06_accounting.tsv",
+        "results/06_targets/provenance/stage06_manifest.tsv",

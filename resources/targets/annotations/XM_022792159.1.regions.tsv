@@ -1,0 +1,4 @@
+transcript_id	region_label	start_1based	end_1based	coordinate_system
+XM_022792159.1	5_prime_UTR	1	329	1-based inclusive transcript coordinates
+XM_022792159.1	CDS	330	665	1-based inclusive transcript coordinates
+XM_022792159.1	3_prime_UTR	666	710	1-based inclusive transcript coordinates

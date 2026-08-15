@@ -1,0 +1,2 @@
+target_id	transcript_id	display_name	organism	molecule_type	fasta_path	fasta_record_id	annotation_path	expected_length_nt	sequence_sha256_uppercase_dna	candidate_lengths_nt	source_database	source_accession_version
+Vd_CHIBIN	XM_022792159.1	Vd-CHIBIN	Varroa destructor	mRNA	resources/targets/references/XM_022792159.1.fa	VdCHIBIN_XM_022792159.1_full_mRNA	resources/targets/annotations/XM_022792159.1.regions.tsv	710	4a0d25aa05b269a118ed1b952dca63ccd1c0a7978fc42295faf3bf650e43ea42	23,24	RefSeq	XM_022792159.1
