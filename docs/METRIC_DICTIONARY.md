@@ -1,7 +1,7 @@
 # Varroa vsiRNA Metric Dictionary
 
-**Version:** 0.15  
-**Scope:** Canonical viral pipeline through viral spatial/transitivity-consistency analysis
+**Version:** 0.16  
+**Scope:** Canonical viral pipeline metrics through Stage 07 empirical single-nucleotide/regional-GC analysis, with Stage 08 candidate-biophysics metrics pre-specified
 
 ---
 
@@ -2613,7 +2613,7 @@ Stages 03–05 therefore provide biological/pathway context while remaining deli
 
 Stage 06 begins the design-facing pipeline with a generic transcript registry and target-agnostic exhaustive candidate enumerator. Vd-CHIBIN / XM_022792159.1 is the first validated regression fixture (688 23-nt + 687 24-nt candidates), not a hard-coded algorithmic special case. Adding another mature transcript should normally require only a FASTA, optional transcript-coordinate annotation, and a target-manifest row—no Python code change.
 
-Stage 07 is a separate empirical branch that extends the matched viral-background logic of Stage 02 across every physical nucleotide position of viral 23/24-nt small RNAs. It tests literature-specified A10 and continuous GC9–14 hypotheses while allowing unbiased single-position A/C/G/T discovery, with sample-balanced inference and conservative multiple-testing control. It measures representation/accumulation associations, not RNAi efficacy or proven AGO loading.
+Stage 07 is a separate empirical branch that extends the matched viral-background logic of Stage 02 across every physical nucleotide position of viral 23/24-nt small RNAs and across every fixed 6-nt regional-GC window. It tests literature-specified A10 and continuous GC9–14 hypotheses while allowing unbiased single-position A/C/G/T discovery and fixed-width local-GC discovery, with sample-balanced inference and conservative multiple-testing control. It measures representation/accumulation associations, not RNAi efficacy or proven AGO loading.
 
 Stage 08 then adds two raw predicted biophysical feature families to Stage 06 target candidates: RNAplfold full-interval target accessibility and guide-versus-passenger 5′ duplex-end thermodynamic asymmetry. These remain predictions and are not converted into efficacy scores or ranking weights until Stage 09.
 
@@ -3193,11 +3193,24 @@ continuous GC9–14
 previous Stage 02 terminal evidence:
 positions 1, 2, L-1, L
 
-unbiased internal discovery:
+unbiased internal single-nucleotide discovery:
 A/C/G/T at positions 3 ... L-2
+
+fixed-width regional discovery:
+all 6-nt GC windows except literature-specified GC9–14
 ```
 
 Pilot-nominated features do not become confirmatory hypotheses.
+
+In particular:
+
+```text
+A at 3p3
+3p5–10 low-GC accumulation association
+3p6–11 low-GC accumulation association
+```
+
+remain exploratory Varroa-derived observations unless independently validated.
 
 ## Stage 07 non-metrics
 
@@ -3212,10 +3225,255 @@ knockdown percentage
 candidate score
 candidate rank
 motif/k-mer score
+variable-width regional-GC optimization
+low-GC/AU-richness bonus
 multivariable predictive model score
 ```
 
 ---
+
+## Fixed-width 6-nt regional GC metrics
+
+These metrics formalize the v0.16 regional-GC extension.
+
+The scan width is fixed at:
+
+```text
+6 nt
+```
+
+No alternative width is part of canonical Stage 07 v0.16.
+
+### `regional_gc6_start_5p`
+
+**Class:** Physical regional coordinate
+
+1-based 5′ coordinate of the first nucleotide in the six-nucleotide window.
+
+Allowed:
+
+```text
+23 nt: 1 ... 18
+24 nt: 1 ... 19
+```
+
+### `regional_gc6_end_5p`
+
+```text
+regional_gc6_start_5p + 5
+```
+
+### `regional_gc6_near_3p`
+
+**Class:** Derived 3′-relative coordinate
+
+```text
+length - regional_gc6_end_5p + 1
+```
+
+This is the window nucleotide closest to the physical 3′ end.
+
+### `regional_gc6_far_3p`
+
+```text
+length - regional_gc6_start_5p + 1
+```
+
+Example:
+
+```text
+23 nt positions 14–19
+=
+3p5–10
+```
+
+The 5′ and 3′ labels identify the same hypothesis and are never counted twice in multiple testing.
+
+### `regional_gc6_fraction`
+
+**Class:** Continuous sequence-composition feature
+
+For one sequence:
+
+```text
+regional_gc6_fraction
+=
+count(G or C within the six positions) / 6
+```
+
+Allowed values:
+
+```text
+0, 1/6, 2/6, 3/6, 4/6, 5/6, 1
+```
+
+### `observed_gc6_mean_unique`
+
+Mean `regional_gc6_fraction` across distinct observed sequences within one sample-virus × length × strand population.
+
+### `observed_gc6_mean_abundance`
+
+Abundance-weighted mean `regional_gc6_fraction` using the canonical Stage 02/07 abundance weights.
+
+### `expected_gc6_mean`
+
+Mean `regional_gc6_fraction` across every fully supported matched viral sequence opportunity for the same sample-virus × length × strand.
+
+The background is identical to Stage 02/07.
+
+### `regional_gc6_delta_unique_vs_expected`
+
+```text
+observed_gc6_mean_unique
+-
+expected_gc6_mean
+```
+
+Positive = observed sequence diversity is more GC-rich than matched viral opportunity.
+
+Negative = observed sequence diversity is more GC-poor/AU-rich than matched viral opportunity.
+
+### `regional_gc6_delta_abundance_vs_expected`
+
+```text
+observed_gc6_mean_abundance
+-
+expected_gc6_mean
+```
+
+Positive = abundance-weighted observed RNAs are more GC-rich than matched viral opportunity.
+
+Negative = abundance-weighted observed RNAs are more GC-poor/AU-rich than matched viral opportunity.
+
+### `regional_gc6_accumulation_delta`
+
+```text
+observed_gc6_mean_abundance
+-
+observed_gc6_mean_unique
+```
+
+Positive = higher-copy observed RNAs are more GC-rich in that region than the diversity of observed sequences.
+
+Negative = higher-copy observed RNAs are more GC-poor/AU-rich in that region.
+
+This is a fraction/percentage-point composition difference.
+
+It is not a fold-change in RNA abundance and not an efficacy effect size.
+
+### `regional_gc6_evidence_class`
+
+Allowed canonical labels:
+
+```text
+literature_validation_gc9_14
+exploratory_regional_gc6
+```
+
+`GC9_14` remains literature-specified because it was motivated from Cedden et al. 2025 before the Varroa regional scan.
+
+All other six-nucleotide windows are exploratory.
+
+Pilot-nominated windows such as `3p5–10` and `3p6–11` remain `exploratory_regional_gc6`.
+
+### `regional_gc6_raw_p`
+
+Two-sided exact sign-test P-value on non-zero sample-level regional deltas.
+
+### `regional_gc6_bh_p`
+
+Benjamini–Hochberg sensitivity-adjusted P-value for an exploratory regional family.
+
+For `GC9_14`, canonical literature-validation multiplicity is handled separately, so this exploratory field is `NA`.
+
+### `regional_gc6_by_p`
+
+Benjamini–Yekutieli primary adjusted P-value for an exploratory regional family.
+
+Families are separated by:
+
+```text
+length × endpoint × strand
+```
+
+and exclude `GC9_14`.
+
+Family sizes:
+
+```text
+23 nt: 17 exploratory windows
+24 nt: 18 exploratory windows
+```
+
+A new regional discovery requires:
+
+```text
+regional_gc6_by_p < 0.05
+```
+
+plus a finite interpretable effect.
+
+### `regional_gc6_validation_bh_p`
+
+For `GC9_14`, the BH-adjusted P-value from the pre-specified 12-test literature-validation family.
+
+For other regional windows this field is `NA`.
+
+### Regional-window dependence rule
+
+Neighboring six-nucleotide windows share five of six positions and therefore are strongly dependent.
+
+A group of adjacent supported windows is interpreted as one broad regional pattern rather than as multiple independent biological discoveries.
+
+The numerically strongest boundary is not automatically considered mechanistically unique.
+
+### Relationship to single-nucleotide metrics
+
+Regional GC is mathematically determined by the constituent position-specific G/C frequencies.
+
+Therefore:
+
+```text
+single-position evidence
++
+regional-GC evidence
+```
+
+must not automatically be treated as independent evidence during later scoring.
+
+Any downstream feature integration must test redundancy/correlation first.
+
+### Relationship to Stage 08 thermodynamics
+
+Regional GC is not the same as duplex-end nearest-neighbour stability.
+
+It ignores sequence order and can describe positions inward from the terminal duplex stacks.
+
+A regional GC feature may be:
+
+```text
+independent of
+correlated with
+or antagonistic to
+```
+
+Stage 08 thermodynamic asymmetry.
+
+Stage 07 does not resolve this relationship.
+
+### Regional-GC non-metrics
+
+Stage 07 does not define:
+
+```text
+low-GC bonus
+AU-richness bonus
+optimal GC threshold
+optimal regional width
+regional efficacy score
+regional candidate rank
+```
+
 
 # 31. Stage 08 generic candidate-biophysics definitions
 
@@ -3484,7 +3742,6 @@ No important statistic should exist only inside a Python script.
 # 34. Main methodological references
 
 - Murcott B, Pawluk RJ, Protasio AV, Akinmusola RY, Lastik D, Hunt VL. 2022. *stepRNA: Identification of Dicer cleavage signatures and passenger strand lengths in small RNA sequences*. Frontiers in Bioinformatics 2:994871. DOI: 10.3389/fbinf.2022.994871.
-- Benjamini Y, Hochberg Y. 1995. *Controlling the False Discovery Rate: A Practical and Powerful Approach to Multiple Testing*. Journal of the Royal Statistical Society Series B 57:289–300.
 - Phipson B, Smyth GK. 2010. *Permutation P-values Should Never Be Zero: Calculating Exact P-values When Permutations Are Randomly Drawn*. Statistical Applications in Genetics and Molecular Biology 9:Article 39.
 - Saravanan V, Berman GJ, Sober SJ. 2020. *Application of the hierarchical bootstrap to multi-level data in neuroscience*. General methodological support for clustered/nested resampling.
 - Stage-05 historical v1.4.1 algorithm descriptions and archived numerical checkpoints are retained as specification/regression references; the original historical source package and exact RNG stream are unavailable, so exact source-code/permutation replication is not claimed.

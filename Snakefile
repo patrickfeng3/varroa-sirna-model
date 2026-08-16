@@ -15,6 +15,7 @@ include: "workflow/rules/stage03.smk"
 include: "workflow/rules/stage04.smk"
 include: "workflow/rules/stage05.smk"
 include: "workflow/rules/stage06.smk"
+include: "workflow/rules/stage07.smk"
 
 
 rule all:
@@ -87,3 +88,19 @@ rule all:
         "results/06_targets/target_candidates.tsv",
         "results/06_targets/qc/stage06_accounting.tsv",
         "results/06_targets/provenance/stage06_manifest.tsv",
+        "results/07_empirical_sequence/positional_by_pair.tsv",
+        "results/07_empirical_sequence/positional_by_sample.tsv",
+        "results/07_empirical_sequence/positional_summary.tsv",
+        "results/07_empirical_sequence/gc9_14_by_pair.tsv",
+        "results/07_empirical_sequence/gc9_14_by_sample.tsv",
+        "results/07_empirical_sequence/gc9_14_summary.tsv",
+        "results/07_empirical_sequence/regional_gc6_by_pair.tsv",
+        "results/07_empirical_sequence/regional_gc6_by_sample.tsv",
+        "results/07_empirical_sequence/regional_gc6_summary.tsv",
+        "results/07_empirical_sequence/regional_gc6_discovery.tsv",
+        "results/07_empirical_sequence/literature_validation.tsv",
+        "results/07_empirical_sequence/discovery_summary.tsv",
+        "results/07_empirical_sequence/sense_comparator.tsv",
+        "results/07_empirical_sequence/qc/stage07_accounting.tsv",
+        "results/07_empirical_sequence/qc/stage02_terminal_regression.tsv",
+        "results/07_empirical_sequence/provenance/stage07_manifest.tsv",
