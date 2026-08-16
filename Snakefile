@@ -20,6 +20,7 @@ include: "workflow/rules/stage08.smk"
 include: "workflow/rules/stage09a.smk"
 include: "workflow/rules/stage09bc.smk"
 include: "workflow/rules/stage10a.smk"
+include: "workflow/rules/stage11.smk"
 
 
 rule all:
@@ -142,3 +143,7 @@ rule all:
         "results/10_candidate_integration/stage10a_pareto_summary.tsv",
         "results/10_candidate_integration/stage10_parameters.tsv",
         "results/10_candidate_integration/stage10_qc.tsv",
+        "web/stage11/data/Vd_CHIBIN_stage11.json",
+        "web/stage11/data/Vd_CHIBIN_stage11.js",
+        "results/11_region_explorer/stage11_export_qc.tsv",
+        "results/11_region_explorer/stage11_parameters.tsv",

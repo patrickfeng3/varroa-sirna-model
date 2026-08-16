@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Varroa siRNA region explorer</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="data/Vd_CHIBIN_stage11.js" defer></script>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body data-stage11-source="data/Vd_CHIBIN_stage11.json">
+  <main>
+    <header>
+      <p class="eyebrow">Canonical Stage 11</p>
+      <h1>siRNA region explorer</h1>
+      <p id="target-summary">Loading transcript evidence…</p>
+    </header>
+
+    <section class="controls" aria-label="Region controls">
+      <fieldset class="guide-control">
+        <legend>Guide length</legend>
+        <div id="guide-length-options" class="segmented" role="radiogroup" aria-label="Guide length">
+          <label><input type="radio" name="guide-length" value="23" checked><span>23 nt</span></label>
+          <label><input type="radio" name="guide-length" value="24"><span>24 nt</span></label>
+        </div>
+      </fieldset>
+      <label>Region length (nt)
+        <input id="region-length" type="number" inputmode="numeric" min="1" step="1">
+      </label>
+      <label>Metric
+        <select id="metric-mode">
+          <option value="layer1">Layer 1</option>
+          <option value="layer2">Layer 2</option>
+          <option value="layer3">Layer 3</option>
+          <option value="total">Total</option>
+        </select>
+      </label>
+    </section>
+
+    <p id="state-message" role="status"></p>
+    <section class="plot-panel">
+      <div id="region-plot" aria-label="Mean contained-window evidence by transcript position"></div>
+    </section>
+
+    <section>
+      <h2>Top and bottom regions by starting feature</h2>
+      <div id="feature-tables" class="feature-grid"></div>
+    </section>
+  </main>
+</body>
+</html>
