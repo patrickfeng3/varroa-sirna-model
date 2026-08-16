@@ -1,7 +1,7 @@
 # Varroa vsiRNA Metric Dictionary
 
-**Version:** 0.20  
-**Scope:** Canonical metrics from Stage 01 through Stage 09 candidate evidence layers  
+**Version:** 0.21  
+**Scope:** Canonical metrics from Stage 01 through Stage 10A individual-window integration  
 **Rule:** Every important statistic must have a documented definition, analysis unit, direction, normalization, interpretation and limitation.
 
 ---
@@ -52,7 +52,7 @@ All candidates sharing:
 target_id × candidate_length_nt
 ```
 
-Canonical unit for Stage 09 normalization.
+Canonical unit for Stage 09 normalization and Stage 10A ranking.
 
 ---
 
@@ -1437,29 +1437,30 @@ No coefficient-stability threshold is used as a candidate filter.
 
 ## `layer2_asymmetry_percentile`
 
-Within-target, within-length favourable percentile of `asymmetry_ddg_4bp`.
+Within-target, within-length favourable percentile of canonical `asymmetry_ddg_4bp`.
 
-More positive = more favourable.
+Higher / more positive = more favourable.
+
+Metric class:
+
+```text
+Canonical
+Project-specific normalization of published-method-derived biophysics
+```
+
+## `layer2_asymmetry_5bp_percentile`
+
+Within-target, within-length favourable percentile of `asymmetry_ddg_5bp`.
+
+Sensitivity only.
+
+It contributes zero weight to `layer2_reference_score`.
 
 ## `layer2_self_fold_percentile`
 
 Within-target, within-length favourable percentile of `guide_self_fold_mfe_kcal_mol`.
 
-Less negative = more favourable.
-
-## `layer2_component_difference`
-
-```text
-layer2_asymmetry_percentile
--
-layer2_self_fold_percentile
-```
-
-Positive = relatively stronger by asymmetry.
-
-Negative = relatively stronger by weak self-folding.
-
-Diagnostic only.
+Higher / less negative = weaker predicted guide self-folding = more favourable.
 
 ## `layer2_reference_score`
 
@@ -1469,27 +1470,43 @@ Diagnostic only.
 0.5 × layer2_self_fold_percentile
 ```
 
-Neutral reference only.
+Range `[0,1]`.
 
-Not a learned biological weight.
+Neutral within-layer reference summary.
 
-## `layer2_alpha_score(alpha)`
+Not a learned biological weight and not an efficacy probability.
+
+## `layer2_asymmetry_4bp_5bp_percentile_difference`
 
 ```text
-alpha × layer2_asymmetry_percentile
-+
-(1-alpha) × layer2_self_fold_percentile
+layer2_asymmetry_percentile
+-
+layer2_asymmetry_5bp_percentile
 ```
 
-for `alpha = 0.0,0.1,...,1.0`.
+Positive = candidate ranks more favourably under the canonical 4-bp definition.
 
-Sensitivity only.
+Negative = candidate ranks more favourably under the 5-bp sensitivity definition.
+
+Diagnostic only.
 
 ## `layer2_asymmetry_4bp_5bp_rho`
 
-Within-target, within-length Spearman correlation between 4-bp and 5-bp asymmetry.
+Within-target, within-length Spearman correlation between:
+
+```text
+asymmetry_ddg_4bp
+asymmetry_ddg_5bp
+```
 
 Robustness diagnostic.
+
+Current Vd-CHIBIN regression fixtures:
+
+```text
+23 nt = 0.916831
+24 nt = 0.915505
+```
 
 ---
 
@@ -1497,13 +1514,15 @@ Robustness diagnostic.
 
 ## `layer3_whole_accessibility_percentile`
 
-Within-target, within-length favourable percentile of canonical whole-site accessibility.
+Within-target, within-length favourable percentile of canonical W150/L100 whole-site target accessibility.
 
 Higher = more favourable.
 
 ## `layer3_seed_accessibility_percentile`
 
-Within-target, within-length favourable percentile of canonical g2–g8 target accessibility.
+Within-target, within-length favourable percentile of canonical W150/L100 guide-g2–g8 target accessibility.
+
+Higher = more favourable.
 
 ## `layer3_reference_score`
 
@@ -1513,31 +1532,32 @@ Within-target, within-length favourable percentile of canonical g2–g8 target a
 0.5 × layer3_seed_accessibility_percentile
 ```
 
-Neutral reference only.
+Range `[0,1]`.
 
-## `layer3_gamma_score(gamma)`
+Neutral within-layer reference summary.
 
-```text
-gamma × layer3_whole_accessibility_percentile
-+
-(1-gamma) × layer3_seed_accessibility_percentile
-```
-
-for `gamma = 0.0,0.1,...,1.0`.
-
-Sensitivity only.
+Not a learned biological weight and not an efficacy probability.
 
 ## `layer3_whole_parameter_sensitivity_rho`
 
-Within-target, within-length correlation between canonical whole-site accessibility and alternative W/L parameterizations.
+Within-target, within-length Spearman correlation between canonical W150/L100 whole-site accessibility and one alternative RNAplfold parameterization.
+
+Sensitivity alternatives:
+
+```text
+W100/L80
+W200/L150
+```
 
 ## `layer3_seed_parameter_sensitivity_rho`
 
-Equivalent seed-side sensitivity correlation.
+Equivalent canonical-versus-sensitivity correlation for seed-side accessibility.
+
+Sensitivity parameterizations contribute zero weight to `layer3_reference_score`.
 
 ---
 
-# 22. Cross-layer metrics
+# 22. Stage 09 cross-layer diagnostic metric
 
 ## `stage09_feature_spearman_rho`
 
@@ -1557,35 +1577,310 @@ Used to identify:
 
 Always length-stratified.
 
+It does not alter candidate scoring.
+
 ---
 
-# 23. Mandatory 23/24 length rule
+# 23. Stage 10A integration metrics
 
-Current empirical Varroa canonical lengths:
+## `stage10_layer1_percentile`
+
+Exact Stage 10 copy of:
+
+```text
+layer1_accumulation_percentile
+```
+
+within the same:
+
+```text
+target × candidate_length
+```
+
+stratum.
+
+No second transformation is applied.
+
+Higher = more favourable empirical accumulation propensity.
+
+## `stage10_layer2_percentile`
+
+Favourable percentile of:
+
+```text
+layer2_reference_score
+```
+
+within:
+
+```text
+target × candidate_length
+```
+
+Formula:
+
+```text
+(r_i - 0.5) / n
+```
+
+with average ascending ranks.
+
+Purpose:
+
+> place the Layer-2 composite on the same layer-level rank-percentile scale used for equal-layer Stage 10A integration.
+
+Higher = more favourable.
+
+This is a rank transform, not a probability.
+
+## `stage10_layer3_percentile`
+
+Favourable percentile of:
+
+```text
+layer3_reference_score
+```
+
+within:
+
+```text
+target × candidate_length
+```
+
+using the same formula and tie handling.
+
+Higher = more favourable.
+
+## `stage10_equal_layer_score`
+
+Let:
+
+```text
+L1 = stage10_layer1_percentile
+L2 = stage10_layer2_percentile
+L3 = stage10_layer3_percentile
+```
+
+Then:
+
+```text
+stage10_equal_layer_score
+=
+(L1 + L2 + L3) / 3
+```
+
+Equivalent layer weights:
+
+```text
+L1 = 1/3
+L2 = 1/3
+L3 = 1/3
+```
+
+Metric class:
+
+```text
+Canonical
+Project-specific
+Neutral integration
+```
+
+Higher = more favourable.
+
+Interpretation:
+
+> average relative favourability across the three predefined evidence layers under an explicitly equal-layer integration rule.
+
+Not:
+
+```text
+RNAi efficacy probability
+knockdown percentage
+mortality probability
+AGO-loading probability
+```
+
+The equal thirds are not learned from Varroa efficacy data.
+
+## `stage10_equal_layer_rank`
+
+Average descending rank of `stage10_equal_layer_score` within:
+
+```text
+target × candidate_length
+```
+
+Direction:
+
+```text
+1 = best
+lower = better
+```
+
+Equal scores receive average rank.
+
+No coordinate- or ID-based tie break.
+
+## `stage10_equal_layer_percentile`
+
+Favourable percentile of `stage10_equal_layer_score` within:
+
+```text
+target × candidate_length
+```
+
+using:
+
+```text
+(r_i - 0.5) / n
+```
+
+with average ascending ranks.
+
+Higher = better relative position.
+
+## `stage10_pareto_dominates(A,B)`
+
+Binary mathematical relation within one:
+
+```text
+target × candidate_length
+```
+
+stratum.
+
+Candidate `A` dominates candidate `B` if:
+
+```text
+L1_A >= L1_B
+L2_A >= L2_B
+L3_A >= L3_B
+```
+
+and at least one inequality is strict.
+
+Identical layer vectors do not dominate each other.
+
+Dominance comparisons use full stored precision and are not performed on rounded display values.
+
+This relation is an algorithmic definition; it need not be emitted as an all-pairs output table.
+
+## `stage10_pareto_front`
+
+Positive integer assigned by iterative non-dominated sorting.
+
+Definition:
+
+```text
+front 1
+=
+candidates not dominated by any other candidate
+
+front k
+=
+non-dominated candidates after fronts 1...(k-1)
+have been removed
+```
+
+Direction:
+
+```text
+lower front number = stronger multi-objective position
+```
+
+Important limitation:
+
+> Pareto front is not a complete ranking. Multiple candidates on the same front may represent different trade-offs.
+
+It is complementary to `stage10_equal_layer_rank`.
+
+## `stage10_minimum_layer_score`
+
+```text
+min(
+    stage10_layer1_percentile,
+    stage10_layer2_percentile,
+    stage10_layer3_percentile
+)
+```
+
+Range `[0,1]`.
+
+Higher = stronger weakest evidence layer.
+
+Diagnostic only.
+
+It is not a gate, filter, tie-break, or primary ranking score.
+
+## `stage10_layer_spearman_rho`
+
+Within-target, within-length Spearman correlation between one pair of Stage 10 layer percentiles:
+
+```text
+L1 vs L2
+L1 vs L3
+L2 vs L3
+```
+
+Range `[-1,+1]`.
+
+Diagnostic only.
+
+## `stage10_pareto_front_n`
+
+Number of candidates in one:
+
+```text
+target × candidate_length × pareto_front
+```
+
+group.
+
+## `stage10_pareto_front_fraction`
+
+```text
+stage10_pareto_front_n
+/
+number of candidates in the target × candidate_length stratum
+```
+
+Diagnostic only.
+
+---
+
+# 24. Mandatory candidate-length separation rule
+
+Current empirically supported Varroa canonical lengths:
 
 ```text
 23 nt
 24 nt
 ```
 
-Even when Stage 09A shares coefficients, the following remain separate:
+Stage 09A fits separate empirical models for the two lengths.
+
+The following remain separate by `target × candidate_length`:
 
 ```text
-validation
-normalization
-score summaries
-correlations
-sensitivity analyses
+Stage 09 validation
+Stage 09 normalization
+Stage 09 correlations
+Stage 09 sensitivity analyses
+Stage 10 layer-level percentile transforms
+Stage 10 equal-layer ranks
+Stage 10 equal-layer percentiles
+Stage 10 Pareto fronts
+Stage 10 correlation diagnostics
 QC
 ```
 
-No automatic 23- or 24-nt bonus.
+No automatic 23-nt or 24-nt bonus.
 
-Raw length-dependent metrics such as whole-site accessibility and guide self-folding must not be treated as directly interchangeable across lengths without explicit downstream length handling.
+No Stage 10 candidate ranking may pool 23-nt and 24-nt windows.
 
 ---
 
-# 24. Future user-configurable length status
+# 25. Future user-configurable length status
 
 The generic software architecture must allow:
 
@@ -1606,55 +1901,87 @@ unsupported
 
 For Varroa, 23/24 should currently be recommended but not enforced as the only allowed inputs.
 
-The current Stage 09A empirical models are separately trained and validated for 23 nt and 24 nt. They must not be labelled validated for another length until that requested length has its own suitable training/validation evidence.
+The current Stage 09A empirical models are separately trained and validated for 23 nt and 24 nt. They must not be labelled validated for another length until that requested length has suitable training/validation evidence.
 
-If multiple lengths are requested, each length remains a separate normalization/analysis population unless a future specification explicitly validates cross-length pooling.
+Stage 10A may integrate another candidate length only if the required Stage 09 layer values exist and their evidence status is exposed.
+
+If multiple lengths are requested, each length remains a separate normalization/ranking population unless a future specification explicitly validates cross-length pooling.
 
 ---
 
-# 25. Metrics deliberately not defined in Stage 09
+# 26. Metrics deliberately not defined in Stage 10A
 
-Do not define yet:
+Do not define in Stage 10A:
 
 ```text
-overall_stage09_score
-overall_candidate_score
 efficacy_probability
+predicted_knockdown_percent
+mortality_probability
 AGO_loading_probability
-final_candidate_rank
+empirically_optimized_cross_layer_score
 final_region_rank
-best_candidate
-0.6/0.3/0.1 weighted score
+best_long_dsRNA_region
 construct_score
+junction_penalty_score
 24bp_construct_score
 48bp_construct_score
 96bp_construct_score
 ```
 
-These belong to Stage 10 or later.
+Stage 10A does define an individual-window `stage10_equal_layer_rank`, but that rank must not be relabelled as measured or predicted efficacy.
+
+Region-level metrics belong to Stage 11 after their specification is frozen.
+
+Construct-level metrics belong to Stage 11 or later.
 
 ---
 
-# 26. External validation status
+# 27. Stage 11 future region-selection status
 
-Muita CHH/Pero observations are not Stage 09 training inputs.
+Stage 11 is reserved for user-configurable longer-region selection and visualization.
+
+Current intended user parameters:
+
+```text
+desired_region_length_nt
+selection_direction = highest / lowest
+number_of_regions_to_return
+```
+
+Current intended primary region statistic:
+
+```text
+mean of contained Stage 10 window scores
+```
+
+This is not yet a canonical metric in v0.21 because the precise treatment of multiple candidate lengths, overlap rules, region boundaries, negative controls, and visualization outputs remains to be specified.
+
+Stage 11 must consume Stage 10A outputs rather than recompute upstream biology.
+
+---
+
+# 28. External validation status
+
+Muita CHH/Pero observations are not Stage 09 or Stage 10 training inputs.
 
 The current Muita CHH analysis is exploratory because the true author-defined administered trigger sequence is unavailable.
 
 When exact trigger sequences become public:
 
 ```text
-freeze Stage 09A model first
-apply frozen model unchanged
+freeze the canonical model/ranking rule first
+apply it unchanged
 evaluate external treatment libraries
 do not retune against Muita
 ```
 
 The same principle applies to future Damayo synthetic-treatment data.
 
+External data must not be used opportunistically to choose Stage 10 cross-layer weights after seeing candidate outcomes.
+
 ---
 
-# 27. Rule for introducing a new metric
+# 29. Rule for introducing a new metric
 
 Every future metric must document:
 
@@ -1678,7 +2005,7 @@ No important statistic should exist only inside code.
 
 ---
 
-# 28. Main methodological references
+# 30. Main methodological references
 
 - Murcott B et al. 2022. *stepRNA: Identification of Dicer cleavage signatures and passenger strand lengths in small RNA sequences.* Frontiers in Bioinformatics 2:994871. DOI `10.3389/fbinf.2022.994871`.
 - Benjamini Y, Hochberg Y. 1995. *Controlling the False Discovery Rate.* JRSS B 57:289–300.
@@ -1692,3 +2019,5 @@ No important statistic should exist only inside code.
 - Cedden D et al. 2025. *Optimizing dsRNA sequences for RNAi in pest control and research with the dsRIP web platform.* BMC Biology 23:114. DOI `10.1186/s12915-025-02219-6`.
 
 Evidence imported from non-Varroa systems remains mechanistic/comparative support only unless separately validated in Varroa.
+
+Numerical coefficients learned in another species must not be transferred into the canonical Varroa Stage 10 integration without a separately justified validation study.
