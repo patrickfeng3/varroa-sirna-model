@@ -118,16 +118,6 @@ def test_exact_sample_aware_weights():
     assert math.isclose(sum(weights[:2]), weights[2])
 
 
-def test_scaling_is_training_only_and_zero_sd_is_omitted():
-    train = [{"x": 0, "constant": 1}, {"x": 2, "constant": 1}]
-    scaling = stage09a.fit_scaling(train, ("x", "constant"))
-    assert scaling.means["x"] == 1
-    assert math.isclose(scaling.sds["x"], math.sqrt(2))
-    assert scaling.omitted == ("constant",)
-    heldout = stage09a.apply_scaling({"x": 1000, "constant": 1}, scaling)
-    assert heldout["x"] == pytest.approx((1000 - 1) / math.sqrt(2))
-
-
 def test_fixed_effect_centering_is_weighted_within_group():
     x, y = stage09a.weighted_within_group_center(
         [[0.0], [2.0], [10.0], [14.0]], [1.0, 5.0, 3.0, 11.0],
@@ -142,26 +132,6 @@ def test_cv_leakage_guard():
     stage09a.assert_cv_partition([{"biological_virus": "A"}], [{"biological_virus": "B"}], "biological_virus")
     with pytest.raises(ValueError, match="leakage"):
         stage09a.assert_cv_partition([{"biological_virus": "A"}], [{"biological_virus": "A"}], "biological_virus")
-
-
-def test_model_structure_construction():
-    scaled = {"x": 2.0, "y": -1.0}
-    assert stage09a.structure_row(scaled, "A_shared", 23) == [2.0, -1.0]
-    assert stage09a.structure_row(scaled, "B_shared_plus_length_interactions", 23) == [2.0, -1.0, 0.0, -0.0]
-    assert stage09a.structure_row(scaled, "B_shared_plus_length_interactions", 24) == [2.0, -1.0, 2.0, -1.0]
-    assert stage09a.structure_row(scaled, "C_separate_23_24", 24) == [2.0, -1.0]
-
-
-def test_model_selection_tie_break_order():
-    rows = [
-        {"selection_score_rho": 0.5, "selection_score_top10": 2.0, "alpha": 0.1, "l1_ratio": 0.5,
-         "model_structure": "A_shared"},
-        {"selection_score_rho": 0.5000005, "selection_score_top10": 2.0, "alpha": 0.3, "l1_ratio": 0.95,
-         "model_structure": "B_shared_plus_length_interactions"},
-        {"selection_score_rho": 0.5, "selection_score_top10": 2.0, "alpha": 0.3, "l1_ratio": 0.95,
-         "model_structure": "A_shared"},
-    ]
-    assert stage09a.choose_model_configuration(rows)["model_structure"] == "A_shared"
 
 
 def test_top10_abundance_metrics_exact():
@@ -208,6 +178,20 @@ def test_rscript_is_resolved_from_active_stage09a_environment(tmp_path):
     assert stage09a.resolve_rscript({"CONDA_PREFIX": str(tmp_path)}) == rscript
     with pytest.raises(RuntimeError, match="CONDA_PREFIX"):
         stage09a.resolve_rscript({})
+
+
+def test_v020_has_two_length_models_and_no_superseded_model_machinery():
+    model = (REPO / "workflow/scripts/stage09a_model.R").read_text(encoding="utf-8")
+    lowered = model.lower()
+    assert "glmnet" not in lowered
+    assert "alpha_grid" not in lowered
+    assert "l1_ratio" not in lowered
+    assert "nested" not in lowered
+    assert "fit_representation" not in lowered
+    assert "hurdle_score" not in lowered
+    assert "lengths <- c(23l, 24l)" in lowered
+    assert '"primary_accumulation_fit_count"' in model
+    assert "12L" in model
 
 
 def test_frozen_accounting_regression():

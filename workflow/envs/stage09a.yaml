@@ -2,4 +2,3 @@ channels:
   - conda-forge
 dependencies:
   - r-base=4.4.3
-  - r-glmnet=4.1_10

@@ -2,8 +2,8 @@
 """Canonical Stage 09A training-universe construction and orchestration.
 
 The Python layer owns frozen-input accounting, exact sequence predictors, and
-deterministic data preparation.  The approved R/glmnet layer owns penalized
-model fitting and validation.
+deterministic data preparation. The base-R layer owns the two canonical
+weighted fixed-effect linear models and their validation.
 """
 
 from __future__ import annotations
@@ -14,11 +14,9 @@ import gzip
 import hashlib
 import math
 import os
-import statistics
 import subprocess
 import tempfile
 from collections import Counter, defaultdict
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Iterator, Mapping, Sequence
 
@@ -42,10 +40,9 @@ EXPECTED_ACCOUNTING = {
     "represented_24nt": 175564,
     "represented_total": 297156,
     "supported_abundance": 3445943.0,
+    "outside_background_species": 3616,
+    "outside_background_abundance": 3973.0,
 }
-ALPHA_GRID = (1e-5, 3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2, 3e-2, 1e-1, 3e-1, 1.0)
-L1_RATIO_GRID = (0.05, 0.25, 0.50, 0.75, 0.95, 1.0)
-STRUCTURES = ("A_shared", "B_shared_plus_length_interactions", "C_separate_23_24")
 STAGE08_FORBIDDEN = {
     "target_whole_p_unpaired",
     "target_seed_g2_8_p_unpaired",
@@ -59,14 +56,6 @@ STAGE08_FORBIDDEN = {
     "guide_self_fold_structure",
 }
 COMPLEMENT = str.maketrans("ACGTU", "TGCAA")
-
-
-@dataclass(frozen=True)
-class Scaling:
-    means: dict[str, float]
-    sds: dict[str, float]
-    retained: tuple[str, ...]
-    omitted: tuple[str, ...]
 
 
 def is_true(value: object) -> bool:
@@ -345,25 +334,6 @@ def sample_aware_weights(rows: Sequence[Mapping[str, object]]) -> list[float]:
     return [value * factor for value in raw]
 
 
-def fit_scaling(rows: Sequence[Mapping[str, object]], feature_names: Sequence[str] = BASE_FEATURE_NAMES) -> Scaling:
-    if not rows:
-        raise ValueError("cannot fit scaling on an empty training fold")
-    means: dict[str, float] = {}
-    sds: dict[str, float] = {}
-    retained, omitted = [], []
-    for name in feature_names:
-        values = [float(row[name]) for row in rows]
-        mean = statistics.fmean(values)
-        sd = statistics.stdev(values) if len(values) > 1 else 0.0
-        means[name], sds[name] = mean, sd
-        (retained if sd > 0 else omitted).append(name)
-    return Scaling(means, sds, tuple(retained), tuple(omitted))
-
-
-def apply_scaling(row: Mapping[str, object], scaling: Scaling) -> dict[str, float]:
-    return {name: (float(row[name]) - scaling.means[name]) / scaling.sds[name] for name in scaling.retained}
-
-
 def weighted_within_group_center(
     values: Sequence[Sequence[float]],
     responses: Sequence[float],
@@ -391,28 +361,6 @@ def weighted_within_group_center(
             centered_y[index] = responses[index] - mean_y
             centered_x[index] = [float(values[index][column]) - mean_x[column] for column in range(width)]
     return centered_x, centered_y
-
-
-def structure_feature_names(structure: str, retained: Sequence[str], length: int | None = None) -> tuple[str, ...]:
-    if structure == "A_shared":
-        return tuple(retained)
-    if structure == "B_shared_plus_length_interactions":
-        return tuple(retained) + tuple(f"{name}_x_24nt" for name in retained)
-    if structure == "C_separate_23_24":
-        if length not in LENGTHS:
-            raise ValueError("separate structure requires length 23 or 24")
-        return tuple(retained)
-    raise ValueError(f"unknown Stage 09A model structure: {structure}")
-
-
-def structure_row(scaled: Mapping[str, float], structure: str, length: int) -> list[float]:
-    names = tuple(scaled)
-    values = [float(scaled[name]) for name in names]
-    if structure == "A_shared" or structure == "C_separate_23_24":
-        return values
-    if structure == "B_shared_plus_length_interactions":
-        return values + [value * int(length == 24) for value in values]
-    raise ValueError(f"unknown Stage 09A model structure: {structure}")
 
 
 def average_ranks(values: Sequence[float]) -> list[float]:
@@ -447,25 +395,6 @@ def top10_abundance_metrics(scores: Sequence[float], abundance: Sequence[float])
     order = sorted(range(len(scores)), key=lambda index: (-scores[index], index))[:selected_n]
     share = sum(abundance[index] for index in order) / total
     return share, share / (selected_n / len(scores))
-
-
-def choose_model_configuration(rows: Sequence[Mapping[str, object]], tolerance: float = 1e-6) -> Mapping[str, object]:
-    if not rows:
-        raise ValueError("no model configurations to select")
-    preference = {name: index for index, name in enumerate(STRUCTURES)}
-    remaining = list(rows)
-    best_rho = max(float(row["selection_score_rho"]) for row in remaining)
-    remaining = [row for row in remaining if best_rho - float(row["selection_score_rho"]) <= tolerance]
-    best_top10 = max(float(row["selection_score_top10"]) for row in remaining)
-    remaining = [row for row in remaining if best_top10 - float(row["selection_score_top10"]) <= tolerance]
-    return sorted(
-        remaining,
-        key=lambda row: (
-            -float(row["alpha"]),
-            -float(row["l1_ratio"]),
-            preference[str(row["model_structure"])],
-        ),
-    )[0]
 
 
 def assert_cv_partition(train_rows: Sequence[Mapping[str, object]], heldout_rows: Sequence[Mapping[str, object]], field: str) -> None:
@@ -545,7 +474,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--legacy-core", type=Path, required=True)
     parser.add_argument("--candidates", type=Path, required=True)
-    parser.add_argument("--solver", type=Path, required=True)
+    parser.add_argument("--wls-helper", type=Path, required=True)
     parser.add_argument("--model-script", type=Path, required=True)
     parser.add_argument("--output-root", type=Path, required=True)
     return parser.parse_args(argv)
@@ -553,7 +482,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
-    for path, label in ((args.solver, "approved glmnet adapter"), (args.model_script, "Stage 09A R model")):
+    for path, label in ((args.wls_helper, "Stage 09A weighted least-squares helper"), (args.model_script, "Stage 09A R model")):
         if not path.is_file():
             raise FileNotFoundError(f"missing {label}: {path}")
     args.output_root.mkdir(parents=True, exist_ok=True)
@@ -573,16 +502,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             "--training", str(training),
             "--candidates", str(candidate_features),
             "--accounting", str(accounting_path),
-            "--solver", str(args.solver),
+            "--wls-helper", str(args.wls_helper),
             "--output-root", str(args.output_root),
         ]
         subprocess.run(command, check=True)
     expected = [
-        "layer1_model_coefficients.tsv", "layer1_model_preprocessing.tsv",
-        "layer1_model_selection.tsv", "layer1_cv_by_group.tsv",
+        "layer1_training_accounting.tsv", "layer1_coefficients_23nt.tsv",
+        "layer1_coefficients_24nt.tsv", "layer1_leave_one_virus_out.tsv",
         "layer1_cv_summary_23nt.tsv", "layer1_cv_summary_24nt.tsv",
-        "layer1_representation_diagnostic.tsv", "layer1_architecture_benchmarks.tsv",
-        "candidate_layer1.tsv",
+        "layer1_coefficient_stability.tsv", "layer1_model_provenance.tsv", "candidate_layer1.tsv",
     ]
     missing = [name for name in expected if not (args.output_root / name).is_file()]
     if missing:
