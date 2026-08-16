@@ -1,8 +1,8 @@
 # Canonical Varroa vsiRNA Pipeline Specification
 
-**Specification version:** 0.17  
-**Status:** Stages 00–06 implemented and validated; Stage 07 single-nucleotide, fixed-width regional-GC, and post-hoc feature-synthesis analyses implemented and validated; Stage 08 candidate biophysics pre-specified and deferred  
-**Scope:** Viral small-RNA analysis, generic transcript candidate preparation, Stage 07 single-nucleotide, fixed-width regional-GC, and feature-synthesis empirical guide-sequence association analysis, and pre-specified Stage 08 candidate biophysics  
+**Specification version:** 0.18  
+**Status:** Stages 00–06 implemented and validated; Stage 07 single-nucleotide, fixed-width regional-GC, and post-hoc feature-synthesis analyses implemented and validated; Stage 08 candidate biophysics fully specified and deferred for implementation  
+**Scope:** Viral small-RNA analysis, generic transcript candidate preparation, Stage 07 empirical guide-sequence association and feature synthesis, and pre-specified Stage 08 whole-site/seed-side accessibility, duplex-end thermodynamic asymmetry, and antisense-guide self-folding  
 **Host transitivity:** Excluded  
 **Candidate ranking:** Excluded through Stage 08
 
@@ -39,7 +39,9 @@ Validated legacy core
    (viral small-RNA dataset; independent computational branch)
         ↓
 08 Generic candidate biophysics:
-   target accessibility + duplex-end asymmetry
+   whole-site + seed-side target accessibility
+   + duplex-end thermodynamic asymmetry
+   + antisense-guide self-folding
 ```
 
 A key reproducibility principle is that Stage 05 has two logically separate branches:
@@ -5287,652 +5289,302 @@ and comprise grouped Wang/Bartel sample and summary tables, physical 3′- and 5
 
 ---
 
-# 08 — Generic candidate biophysics: target accessibility and duplex-end thermodynamic asymmetry
+# 08 — Generic candidate biophysics
 
-## 08.1 Purpose
+## 08.0 Purpose and scope
 
-Stage 08 calculates two **raw biophysical candidate features** for every Stage 06 transcript interval:
+Stage 08 calculates **raw predicted biophysical properties** for every candidate emitted by Stage 06. It is deliberately independent of the Stage 07 empirical sequence-feature evidence: Stage 07 features are not used to alter, filter, reward, penalize, or otherwise modify Stage 08 calculations.
 
-1. target-site accessibility on the supplied mature transcript; and
-2. relative thermodynamic stability of the two 5′ ends of the perfectly complementary guide/passenger duplex.
+Stage 08 is **target-agnostic**. Each mature/spliced target transcript is analysed independently. The current Vd-CHIBIN transcript (`XM_022792159.1`) is a worked fixture and regression target, not a hard-coded target.
 
-The implementation must remain **target-agnostic**.
+Stage 08 has four biological components:
 
-Vd-CHIBIN is the first regression target, not an algorithmic special case.
+1. **Whole-site predicted target accessibility** — probability that the entire candidate target interval is simultaneously unpaired.
+2. **Seed-side / target-site 3′ accessibility** — probability that the target nucleotides complementary to guide positions g2–g8 are simultaneously unpaired; this is a secondary local descriptor.
+3. **Duplex-end thermodynamic asymmetry** — relative local stability of the intended guide 5′ duplex end versus the passenger 5′ duplex end.
+4. **Antisense-guide self-folding** — predicted minimum-free-energy secondary structure of the isolated antisense guide.
 
-Stage 08 does **not**:
+Stage 08 produces **no efficacy score, ranking score, weight, bonus, penalty, threshold, pass/fail gate, or candidate removal**. Every valid Stage 06 candidate must be retained. Downstream integration is deferred.
 
-- join Stage 02 nucleotide-enrichment values;
-- use Stage 03/04 duplex geometry;
-- use Stage 05 transitivity;
-- convert raw features to percentiles;
-- calculate A, T, N, S or another aggregate score;
-- apply an asymmetry pass/fail gate;
-- rank candidates;
-- select target regions;
-- implement Stage 09.
+## 08.1 Inputs
 
-The historical weighted A/T/N/S scanner is a regression reference only and is not automatically inherited by the canonical pipeline.
+Primary input is the canonical Stage 06 candidate table. For every candidate, Stage 08 requires at minimum:
 
----
+- `target_id`
+- `transcript_id`
+- `candidate_id`
+- `candidate_length_nt`
+- `start_1based`
+- `end_1based`
+- `target_sequence_rna`
+- `antisense_guide_sequence_rna`
 
-## 08.2 Inputs
+The full mature/spliced target transcript sequence used by Stage 06 must also be available and provenance-checked. Stage 08 must verify that:
 
-Canonical inputs:
+- `target_sequence_rna` equals the transcript interval `[start_1based, end_1based]`;
+- `antisense_guide_sequence_rna` is the exact reverse complement of that target interval;
+- sequences contain only A/C/G/U after normalization;
+- candidate length equals sequence length.
 
-```text
-resources/targets/target_manifest.tsv
-results/06_targets/target_candidates.tsv
-```
+## 08.2 Software and parameter provenance
 
-plus each registered transcript FASTA referenced by the target manifest.
+### ViennaRNA
 
-No Stage 00–05 result table is a computational dependency.
+Canonical structural calculations use **ViennaRNA Package 2.7.2** at **37 °C**, with the exact version recorded in Stage 08 provenance. Version 2.7.2 is the pinned implementation version for this stage. A different ViennaRNA version requires explicit revalidation before canonical results are regenerated.
 
-No live database fetch is permitted during canonical Stage 08 execution.
+ViennaRNA is used for:
 
-Stage 08 must preserve at least:
+- RNAplfold/local unpaired probabilities;
+- RNAfold minimum-free-energy self-folding of the antisense guide.
 
-```text
-target_id
-transcript_id
-candidate_id
-candidate_length_nt
-start_1based
-end_1based
-target_sequence_rna
-antisense_guide_sequence_rna
-```
+Default canonical RNA energy parameters supplied with ViennaRNA 2.7.2 are used for these structural calculations unless a later specification explicitly changes them.
 
-from Stage 06.
+### Terminal thermodynamics
 
----
+Duplex-end asymmetry does **not** use RNAduplex/RNAcofold MFE optimization. It uses a deterministic local nearest-neighbour calculation based on the **Zuber et al. 2022** RNA helix ΔG°37 parameterization (`doi:10.1093/nar/gkac261`). The exact parameter constants used by the implementation must be stored in a tracked resource table rather than embedded only in code, with source and units recorded.
 
-# 08A — Target-site accessibility
+Because Stage 06 candidates are exact reverse complements, only canonical Watson–Crick pair terms are required. For a local terminal stability calculation, use:
 
-## 08.3 Biological interpretation
+- the relevant Watson–Crick nearest-neighbour stack increments from Zuber et al. 2022;
+- the Zuber sequence-dependent correction for the **actual outer physical helix end** when applicable;
+- **no initiation term** and **no symmetry term**, because the quantity is a local end-stability contribution within the same longer duplex, not the free energy of forming an isolated short duplex;
+- no artificial correction at the inner boundary of the 4- or 5-bp subwindow, because the full duplex continues beyond that boundary.
 
-Accessibility is calculated on the **target transcript / sense mRNA**, not on the antisense guide.
+This project-defined local-end quantity must be described as a **local terminal stability descriptor**, not as the full ΔG of an isolated 4- or 5-bp RNA duplex.
 
-The primary quantity is:
+## 08.3 08A — Whole-site predicted target accessibility
 
-```text
-P_unpaired(candidate)
-```
+### Biological quantity
 
-defined as the equilibrium probability, under the RNAplfold local partition-function model, that the **entire candidate interval** is simultaneously unpaired.
+For each candidate target interval `[s,e]` of length `w`, define:
 
-Higher values mean that the complete target interval is predicted to be more available for intermolecular recognition.
+`target_whole_p_unpaired = P(target nucleotides s..e are simultaneously unpaired)`
 
-This is a computational secondary-structure prediction, not a direct measurement of in-vivo RNA structure.
+under the local RNA structural ensemble predicted for the complete mature/spliced target transcript.
 
-Published experimental and computational studies support target accessibility as a determinant of siRNA/RISC target recognition, while also showing that accessibility is only one contributor to silencing efficacy.
+This is a **predicted intrinsic structural accessibility** descriptor. It is not measured accessibility and does not model translation, RNA-binding proteins, RNA modification, or active structural remodelling in vivo.
 
----
+### RNAplfold calculation
 
-## 08.4 RNAplfold model
+RNAplfold must be run on the **full transcript**, not independently on each candidate fragment.
 
-Use ViennaRNA `RNAplfold`.
+Primary parameters:
 
-Canonical software requirement:
+- temperature = 37 °C
+- `W = 150 nt` local averaging window
+- `L = 100 nt` maximum base-pair span
+- `u = max(candidate_length_nt)` for that transcript, with `u >= 7`
 
-```text
-ViennaRNA = 2.7.2
-```
+Pre-specified robustness settings:
 
-or an explicitly updated version recorded in provenance and revalidated against the Stage 08 regression tests before becoming canonical.
+- sensitivity 1: `W = 100`, `L = 80`
+- sensitivity 2: `W = 200`, `L = 150`
 
-RNAplfold computes local partition functions and unpaired probabilities using sliding windows.
+For a transcript shorter than a requested window, use `W_eff = min(W, transcript_length)` and `L_eff = min(L, W_eff - 1)`; record effective values. The same rule applies to sensitivity settings.
 
-For a candidate ending at transcript coordinate `e` with length `w`, extract the `_lunp` value corresponding to:
+The implementation may use the RNAplfold command-line interface or the equivalent ViennaRNA API, but coordinate mapping must be verified by explicit unit tests. The scientific definition is always the probability that the **exact Stage 06 interval** is simultaneously unpaired; parser/index conventions must not redefine the metric.
 
-```text
-[e-w+1 ... e]
-```
+Primary output:
 
-at interval length `w`.
+- `target_whole_p_unpaired`
 
-The extraction must be tested against hand-checked synthetic output so that end-coordinate versus start-coordinate indexing cannot be reversed.
+Robustness outputs:
 
----
+- `target_whole_p_unpaired_w100_l80`
+- `target_whole_p_unpaired_w200_l150`
 
-## 08.5 Canonical accessibility parameter profile
+Values must remain raw probabilities in `[0,1]`. Zero is valid. Do not add pseudocounts or log-transform in Stage 08.
 
-The current project profile preserves the previously audited three RNAplfold scales:
+### Interpretation
 
-Primary:
+Higher values mean the complete target interval is more often predicted to be simultaneously unpaired in the RNAplfold ensemble. Because simultaneous-unpaired probability depends strongly on interval length, 23- and 24-nt values must not be treated as directly equivalent efficacy scales.
 
-```text
-label = W150_L100_main
-W = 150
-L = 100
-```
+Target accessibility is retained because target structure can influence AGO–target association, but its downstream predictive importance is **not assumed**. In the 2025 Tribolium dsRIP study, predicted mRNA accessibility was not a significant efficacy predictor, whereas other features were more informative.
 
-Sensitivity:
+## 08.4 08A-secondary — Seed-side / target-site 3′ accessibility
 
-```text
-label = W100_L80_sensitivity
-W = 100
-L = 80
-```
+The secondary local accessibility descriptor uses the target nucleotides complementary to physical guide positions **g2–g8**, a conventional AGO seed-recognition interval.
 
-and:
+For a candidate target interval ending at transcript coordinate `e`:
 
-```text
-label = W200_L150_sensitivity
-W = 200
-L = 150
-```
+- guide g1 pairs target `e`;
+- guide g2 pairs target `e-1`;
+- …;
+- guide g8 pairs target `e-7`.
 
-Canonical model temperature:
+Therefore define:
 
-```text
-T = 37.0 °C
-```
+`target_seed_g2_8_p_unpaired = P(target nucleotides e-7 .. e-1 are simultaneously unpaired)`
 
-For each target:
+This is a seven-nucleotide target interval on the target-site 3′ side.
 
-```text
-u = maximum candidate_length_nt requested for that target
-```
+Use the same transcript-level RNAplfold runs as for whole-site accessibility; do not refold the transcript separately for each candidate or for the seed metric.
 
-Thus the current Vd-CHIBIN 23/24 analysis uses:
+Primary output:
 
-```text
-u = 24
-```
+- `target_seed_g2_8_p_unpaired`
 
-and both 23-nt and 24-nt accessibility values are extracted from the same RNAplfold run for a given W/L parameter set.
+Robustness outputs:
 
-The three W/L choices are **project modelling scales**, not universal biological constants. Their purpose is to test whether candidate accessibility is robust to reasonable changes in local folding context.
+- `target_seed_g2_8_p_unpaired_w100_l80`
+- `target_seed_g2_8_p_unpaired_w200_l150`
 
-Stage 09 must not treat agreement across these settings as independent biological replication.
+This metric is **secondary**. Do not add canonical g2–g5, g2–g6, g2–g7, or other window variants in Stage 08. If a future sensitivity analysis is justified, it must be specified separately.
 
----
+For generic candidate lengths <8 nt, return NA and record a QC/info reason; current canonical 23/24-nt candidates are fully eligible.
 
-## 08.6 Generic handling of transcript length
+## 08.5 08B — Duplex-end thermodynamic asymmetry
 
-The Stage 08 engine must not assume a 710-nt transcript.
+### Biological quantity
 
-For requested RNAplfold window `W_req`, maximum base-pair span `L_req`, and transcript length `N`:
+Thermodynamic asymmetry describes whether the intended antisense guide has a relatively weak 5′ duplex end compared with the passenger strand. Classic RNAi studies established that relative 5′-end stability influences strand selection, and the 2025 Tribolium study found thermodynamic asymmetry associated with insecticidal siRNA efficacy and antisense:sense representation in RISC-bound small RNA.
 
-```text
-W_eff = min(W_req, N)
-L_eff = min(L_req, W_eff)
-```
+Stage 08 treats the candidate as an **idealized perfectly complementary RNA duplex** composed of:
 
-Record both requested and effective values.
+- guide = Stage 06 `antisense_guide_sequence_rna`;
+- passenger = Stage 06 target/sense RNA sequence for the candidate interval.
 
-Require:
+### No imposed Dicer overhang
 
-```text
-u <= W_eff
-```
+**Do not impose a 2-nt or any other Dicer overhang in Stage 08.** The previous stepRNA analysis measured empirical read-pair end offsets in observed Varroa viral small RNAs and found heterogeneous same-duplex geometries. Those observed offsets are pathway/population evidence and are not an intrinsic property that can be assigned to every hypothetical Stage 06 candidate.
 
-for every enabled parameter set.
+Thus Stage 08 asymmetry is calculated on the full perfectly complementary candidate duplex with no added, removed, or shifted nucleotides.
 
-If this is not satisfied, fail clearly rather than silently truncating the requested unpaired interval.
+### Primary 4-bp local end stability
 
----
+Guide-side physical end:
 
-## 08.7 Accessibility outputs
+- guide positions g1–g4, corresponding to the guide 5′ end.
 
-For each candidate record:
+Passenger-side physical end:
 
-```text
-accessibility_p_W150_L100
-accessibility_p_W100_L80
-accessibility_p_W200_L150
-```
+- passenger positions p1–p4, corresponding to guide positions 3p1–3p4 on the opposite end of the duplex.
 
-and descriptive robustness summaries:
+For each end, define local terminal stability at 37 °C as:
 
-```text
-accessibility_p_min
-accessibility_p_max
-accessibility_p_range
-```
+`local_terminal_dg_4bp = sum(3 nearest-neighbour stack ΔG°37 increments) + applicable Zuber-2022 correction at the actual outer physical helix end`
 
-where:
+Only the **outer physical end** receives a helix-end correction. The internal edge between base pairs 4 and 5 is not a helix terminus.
 
-```text
-accessibility_p_min
-    = minimum probability across enabled parameter sets
+Record:
 
-accessibility_p_max
-    = maximum probability across enabled parameter sets
+- `guide_5p_terminal_dg_4bp`
+- `passenger_5p_terminal_dg_4bp`
 
-accessibility_p_range
-    = accessibility_p_max - accessibility_p_min
-```
+Then define the canonical asymmetry metric:
 
-These remain raw/descriptive values.
+`asymmetry_ddg_4bp = guide_5p_terminal_dg_4bp - passenger_5p_terminal_dg_4bp`
 
-Do **not** convert them to percentiles or combine them with fixed weights in Stage 08.
+Sign convention:
 
-Important cross-length rule:
+- `asymmetry_ddg_4bp > 0`: guide 5′ end is relatively **less stable** than passenger 5′ end; classically guide-favouring direction.
+- `= 0`: balanced local terminal stability.
+- `< 0`: guide 5′ end is relatively **more stable**; opposite the classical guide-favouring direction.
 
-> the probability that an entire 24-nt interval is unpaired is a stricter event than the corresponding 23-nt event.
+This sign convention must be tested explicitly with synthetic sequences.
 
-Therefore raw 23-nt and 24-nt full-interval probabilities must not automatically be treated as directly comparable efficacy scores.
+### 5-bp robustness metric
 
-Any cross-length normalization belongs in Stage 09.
+Repeat the same local calculation using g1–g5 and p1–p5:
 
----
+- `guide_5p_terminal_dg_5bp`
+- `passenger_5p_terminal_dg_5bp`
+- `asymmetry_ddg_5bp`
 
-# 08B — Duplex-end thermodynamic asymmetry
+The 5-bp result is a **sensitivity/robustness metric**, not a second independent biological feature.
 
-## 08.8 Biological rationale
+Stage 08 must not impose a favourable-asymmetry threshold or filter candidates.
 
-For a perfectly complementary small-RNA duplex, the two strands can differ in the local stability of their 5′ ends.
+## 08.6 08C — Antisense-guide self-folding
 
-Classical RNAi studies showed that the strand whose 5′ end is less stably paired is often preferentially selected as guide during RISC assembly. Drosophila studies provide direct mechanistic evidence that RISC-loading machinery can sense terminal duplex asymmetry.
+For every candidate, fold the **isolated antisense guide sequence itself** using RNAfold / the equivalent ViennaRNA 2.7.2 MFE API at 37 °C.
 
-However:
+Record:
 
-```text
-favourable terminal asymmetry
-≠
-guaranteed guide loading
-≠
-guaranteed knockdown
-```
+- `guide_self_fold_mfe_kcal_mol`
+- `guide_self_fold_structure`
 
-The canonical project has not established a Varroa-specific quantitative loading rule.
+Interpretation:
 
-Stage 08 therefore calculates **raw asymmetry features** and directional signs only.
+- more negative MFE = more stable predicted self-structure;
+- MFE closer to zero = weaker predicted self-folding.
 
----
+This is a single-MFE-structure descriptor, not a complete characterization of the guide structural ensemble. No binary hairpin rule, MFE threshold, or efficacy cutoff is applied.
 
-## 08.9 Duplex definition
+The 2025 Tribolium dsRIP study provides insect-specific empirical support for weaker antisense secondary structure being associated with greater efficacy, but Stage 08 records the physical descriptor only and does not assume transferability to Varroa.
 
-For each Stage 06 candidate:
+Because MFE is length-dependent, 23- and 24-nt values should be compared cautiously and downstream analyses should account for guide length.
 
-```text
-guide
-    = antisense_guide_sequence_rna, 5′→3′
+## 08.7 Required Stage 08 output table
 
-passenger
-    = target_sequence_rna, 5′→3′
-```
+`candidate_biophysics.tsv` contains exactly one row per valid Stage 06 candidate and preserves all Stage 06 identifiers and coordinates. At minimum add:
 
-These sequences are exact reverse complements and define a perfectly paired RNA/RNA duplex for the purpose of the terminal-stability calculation.
+- `target_whole_p_unpaired`
+- `target_whole_p_unpaired_w100_l80`
+- `target_whole_p_unpaired_w200_l150`
+- `target_seed_g2_8_p_unpaired`
+- `target_seed_g2_8_p_unpaired_w100_l80`
+- `target_seed_g2_8_p_unpaired_w200_l150`
+- `guide_5p_terminal_dg_4bp`
+- `passenger_5p_terminal_dg_4bp`
+- `asymmetry_ddg_4bp`
+- `guide_5p_terminal_dg_5bp`
+- `passenger_5p_terminal_dg_5bp`
+- `asymmetry_ddg_5bp`
+- `guide_self_fold_mfe_kcal_mol`
+- `guide_self_fold_structure`
 
-No Dicer overhang is added.
+Additional required outputs:
 
-No mismatch is introduced.
+- `stage08_parameters.tsv` — software versions, RNAplfold parameter sets, temperature, Zuber parameter-source identifier/version, and effective transcript-specific W/L values.
+- `stage08_qc.tsv` — machine-readable QC checks and severities.
 
-No candidate-specific secondary structure is folded for this calculation.
+No ranking table is produced in Stage 08.
 
-The metric is a local duplex-end stability surrogate, not the free energy of the entire small-RNA duplex.
+## 08.8 Required QC and regression tests
 
----
+At minimum Stage 08 QC must verify:
 
-## 08.10 Nearest-neighbour model
+1. **Input accounting:** candidate output count exactly equals eligible Stage 06 input count; no silent candidate loss.
+2. **Orientation:** guide is exact reverse complement of target interval.
+3. **Coordinates:** candidate transcript interval matches Stage 06 sequence.
+4. **RNAplfold range:** every non-NA accessibility probability is finite and in `[0,1]`.
+5. **RNAplfold indexing:** synthetic/hand-calculated coordinate tests verify whole-site and g2–g8 interval extraction; do not rely on untested `_lunp` row semantics.
+6. **Transcript reuse:** one transcript-level RNAplfold calculation per transcript × parameter set, not one fold per candidate.
+7. **Accessibility interval:** g2–g8 target coordinates are exactly `[e-7,e-1]`.
+8. **Thermodynamic parameter integrity:** implementation parameters exactly match the tracked Zuber-2022 resource table.
+9. **Terminal orientation:** guide 5′ and passenger 5′ segments are independently unit-tested.
+10. **Physical-end correction:** only the actual outer helix end receives the Zuber end correction; the internal subwindow boundary does not.
+11. **Asymmetry sign:** a synthetic weak-guide/strong-passenger end produces positive `asymmetry_ddg`.
+12. **4-vs-5 robustness:** both metrics are generated independently and 5-bp is labelled sensitivity only.
+13. **No overhang assumption:** no candidate sequence is shifted, shortened, extended, or offset to impose Dicer geometry.
+14. **Self-fold sequence:** RNAfold input equals the Stage 06 antisense guide exactly.
+15. **Self-fold output:** dot-bracket length equals guide length; MFE is finite.
+16. **No scoring:** Stage 08 contains no weights, ranks, thresholds, composite scores, or candidate filtering.
+17. **No Stage 07 leakage:** Stage 07 empirical feature values do not alter Stage 08 calculations.
 
-Use canonical Watson–Crick RNA/RNA nearest-neighbour stacking free energies from the ViennaRNA default Turner-2004 parameter model at 37 °C.
+## 08.9 Interpretation boundaries
 
-The implementation must obtain or validate the stacking parameters from the pinned ViennaRNA parameter set; it must not silently substitute unrelated DNA, RNA/DNA or alternative fitted parameters.
+Stage 08 metrics are **predictions/descriptors**, not direct measurements of RNAi efficacy.
 
-The provenance record must include:
+- RNAplfold accessibility models an equilibrium local RNA structural ensemble and does not capture translation-driven unmasking, RNA-binding proteins, modifications, or other cellular dynamics.
+- Thermodynamic asymmetry has strong mechanistic precedent for strand selection, but its magnitude is not assumed to be a calibrated Varroa efficacy scale.
+- Guide self-fold MFE is a predicted isolated-guide property and does not model AGO-bound structure.
+- A3p3 and other Stage 07 empirical features may correlate or conflict with asymmetry; Stage 08 does not resolve those relationships.
 
-```text
-ViennaRNA version
-parameter-set identity
-temperature
-```
+Any assessment of correlation, redundancy, antagonism, or incremental information between Stage 07 and Stage 08 belongs downstream.
 
-The nearest-neighbour model is appropriate because RNA duplex stability depends on adjacent base-pair stacks rather than independent base-pair counts.
+## 08.10 Academic basis
 
----
+Key references for this stage:
 
-## 08.11 Main terminal asymmetry definition
-
-Primary terminal length:
-
-```text
-4 paired nucleotides
-```
-
-This contains:
-
-```text
-3 nearest-neighbour stacks
-```
-
-For the guide 5′ end:
-
-```text
-guide_5p_stack_dg_4bp_kcal_mol
-    = sum of the 3 Turner nearest-neighbour stack ΔG°37 terms
-      across the first 4 paired nucleotides at the guide 5′ end
-```
-
-For the passenger 5′ end:
-
-```text
-passenger_5p_stack_dg_4bp_kcal_mol
-    = analogous sum at the passenger 5′ end
-```
-
-Define:
-
-```text
-asymmetry_ddg_4bp_kcal_mol
-    =
-    guide_5p_stack_dg_4bp_kcal_mol
-    -
-    passenger_5p_stack_dg_4bp_kcal_mol
-```
-
-Because more-negative duplex free energy is more stable:
-
-```text
-asymmetry_ddg_4bp > 0
-```
-
-means:
-
-> the desired antisense guide 5′ end is less stably paired than the passenger 5′ end.
-
-This direction is consistent with the classical strand-selection tendency.
-
-Stage 08 must not call this a pass/fail rule.
-
----
-
-## 08.12 Five-nucleotide sensitivity feature
-
-Also calculate a pre-specified terminal-length sensitivity feature using:
-
-```text
-5 paired nucleotides
-= 4 nearest-neighbour stacks
-```
-
-with:
-
-```text
-guide_5p_stack_dg_5bp_kcal_mol
-passenger_5p_stack_dg_5bp_kcal_mol
-asymmetry_ddg_5bp_kcal_mol
-```
-
-and the same sign convention.
-
-This sensitivity is retained because published Drosophila siRNA analyses have used terminal free-energy windows spanning approximately the first five nucleotides, and because the previous project workflow used a 5-bp sensitivity calculation.
-
-The 4-bp and 5-bp features are correlated model summaries, not independent experiments.
-
----
-
-## 08.13 Stack-only terminology
-
-The Stage 08 quantities above are deliberately named:
-
-```text
-stack_dg
-```
-
-because they sum nearest-neighbour stacking terms.
-
-They are **not** labelled as complete duplex formation free energies.
-
-Unless explicitly added in a future specification, Stage 08 does not add:
-
-- duplex initiation terms;
-- 3′ DNA/RNA overhang terms;
-- concentration-dependent melting terms;
-- whole-duplex RNAcofold energies;
-- target-opening penalties to the asymmetry calculation.
-
-This explicit naming prevents the historical stack-only metric from being over-interpreted as a complete physical ΔG of duplex formation.
-
----
-
-## 08.14 Asymmetry robustness annotations
-
-Descriptive fields:
-
-```text
-asymmetry_direction_4bp
-asymmetry_direction_5bp
-asymmetry_direction_consistent
-```
-
-where direction is:
-
-```text
-guide_5p_less_stable     if ΔΔG > 0
-equal_within_numeric_tol if |ΔΔG| <= numeric tolerance
-guide_5p_more_stable     if ΔΔG < 0
-```
-
-and `asymmetry_direction_consistent` indicates whether the 4-bp and 5-bp calculations support the same non-zero direction.
-
-This is annotation only.
-
-No candidate is filtered in Stage 08.
-
----
-
-# 08C — Generic outputs, QC and interpretation
-
-## 08.15 Canonical outputs
-
-```text
-results/08_candidate_biophysics/
-│
-├── candidate_accessibility.tsv
-├── candidate_thermodynamic_asymmetry.tsv
-├── candidate_biophysics.tsv
-│
-├── qc/
-│   └── stage08_accounting.tsv
-│
-└── provenance/
-    ├── stage08_manifest.tsv
-    └── rnaplfold_runs.tsv
-```
-
-`candidate_biophysics.tsv` is the canonical Stage 08 joined table.
-
-It must contain exactly one row for every Stage 06 candidate.
-
----
-
-## 08.16 Required canonical joined-table fields
-
-Carry forward:
-
-```text
-target_id
-transcript_id
-candidate_id
-candidate_length_nt
-start_1based
-end_1based
-target_sequence_rna
-antisense_guide_sequence_rna
-```
-
-Accessibility:
-
-```text
-accessibility_p_W150_L100
-accessibility_p_W100_L80
-accessibility_p_W200_L150
-accessibility_p_min
-accessibility_p_max
-accessibility_p_range
-```
-
-Thermodynamic asymmetry:
-
-```text
-guide_5p_stack_dg_4bp_kcal_mol
-passenger_5p_stack_dg_4bp_kcal_mol
-asymmetry_ddg_4bp_kcal_mol
-
-guide_5p_stack_dg_5bp_kcal_mol
-passenger_5p_stack_dg_5bp_kcal_mol
-asymmetry_ddg_5bp_kcal_mol
-
-asymmetry_direction_4bp
-asymmetry_direction_5bp
-asymmetry_direction_consistent
-```
-
-No Stage 08 column may be called:
-
-```text
-A
-T
-N
-S
-score
-rank
-pass
-fail
-primary_score
-secondary_score
-```
-
----
-
-## 08.17 Generic QC
-
-### Accounting
-
-For every target × candidate-length stratum:
-
-```text
-Stage 08 row count = Stage 06 row count
-```
-
-and globally:
-
-```text
-Stage 08 canonical rows = Stage 06 canonical rows
-```
-
-No candidate may disappear because of low accessibility or unfavourable asymmetry.
-
-### Accessibility
-
-Require:
-
-- all probabilities finite;
-- `0 <= P_unpaired <= 1`;
-- exact Stage 06 coordinate match;
-- candidate length equals extracted RNAplfold interval length;
-- extraction uses candidate end coordinate and requested interval length correctly;
-- sensitivity summary arithmetic is exact;
-- one RNAplfold run per target × parameter set, not per candidate;
-- requested/effective W/L/u values recorded.
-
-### Thermodynamic asymmetry
-
-Require:
-
-- guide remains exact reverse complement of target;
-- 4-bp calculation uses exactly 3 terminal stacks;
-- 5-bp calculation uses exactly 4 terminal stacks;
-- guide 5′ and passenger 5′ ends are not swapped;
-- stored `ΔΔG = guide - passenger`;
-- sign annotation matches stored ΔΔG;
-- hand-calculated regression examples agree with implementation;
-- no infeasible-energy sentinel such as `100000` is accepted.
-
-### Genericity
-
-Tests must include at least one non-Vd-CHIBIN synthetic transcript and non-23/24 candidate length for the reusable helper functions.
-
-Target-specific regression tests may additionally use Vd-CHIBIN.
-
----
-
-## 08.18 Vd-CHIBIN regression requirements
-
-For the current first target:
-
-```text
-target_id = Vd_CHIBIN
-transcript_id = XM_022792159.1
-Stage 06 rows = 1,375
-```
-
-Expected Stage 08 rows:
-
-```text
-23 nt = 688
-24 nt = 687
-total = 1,375
-```
-
-Accessibility regression should compare the canonical W150/L100, W100/L80 and W200/L150 raw values against the previously audited Vd-CHIBIN accessibility outputs when those historical files are supplied as a regression fixture.
-
-Thermodynamic regression should compare the new 4-bp/5-bp stack-sum calculation against the previously corrected Vd-CHIBIN thermodynamic table when that historical table is supplied as a regression fixture.
-
-Historical files are **regression checks only**, not Stage 08 computational inputs.
-
-If the historical regression fixture is absent, canonical Stage 08 must still run from Stage 06 + the registered transcript FASTA.
-
----
-
-## 08.19 Interpretation limitations
-
-Accessibility limitations:
-
-- RNAplfold predicts a thermodynamic secondary-structure ensemble;
-- it does not directly measure in-vivo structure;
-- RNA-binding proteins, translation, modifications, cellular localization and non-equilibrium folding can alter real accessibility;
-- W/L choices define a model of local structural context.
-
-Thermodynamic-asymmetry limitations:
-
-- the feature is based on a perfectly complementary duplex;
-- the stack-only calculation is a local stability surrogate;
-- actual small-RNA termini, overhangs, 5′ phosphorylation, Argonaute identity and loading cofactors can affect strand selection;
-- classical asymmetry rules are supported strongly in model systems such as Drosophila, but no quantitative Varroa-specific loading function is assumed.
-
-Therefore Stage 08 results should be described as:
-
-```text
-predicted target accessibility
-and
-predicted duplex-end thermodynamic asymmetry
-```
-
-not as direct measurements of RNAi efficacy.
-
----
-
-## 08.20 Carry-forward to Stage 09
-
-Stage 09 may integrate Stage 08 raw features with empirical Stage 02 terminal-nucleotide evidence.
-
-Before defining Stage 09, the project must decide explicitly:
-
-- within-target normalization;
-- within-length versus cross-length comparison;
-- whether accessibility robustness should use main/min/range or another rule;
-- whether asymmetry sign should be a gate, a continuous feature, or both;
-- whether any weights are justified.
-
-The historical:
-
-```text
-A = 0.70 main + 0.30 robustness
-T = 0.70 main + 0.30 robustness
-S = 0.60A + 0.30T + 0.10N
-```
-
-must **not** be imported automatically.
-
-No arbitrary ranking weights are defined in Stage 08.
-
----
+- Schwarz DS et al. *Cell* (2003). Asymmetry in the assembly of the RNAi enzyme complex. DOI: `10.1016/S0092-8674(03)00759-1`.
+- Tomari Y et al. *Science* (2004). A protein sensor for siRNA asymmetry. DOI: `10.1126/science.1102755`.
+- Ruijtenberg S et al. *Nature Structural & Molecular Biology* (2020). mRNA structural dynamics shape Argonaute-target interactions. DOI: `10.1038/s41594-020-0461-1`.
+- Zuber J et al. *Nucleic Acids Research* (2022). Nearest neighbor rules for RNA helix folding thermodynamics: improved end effects. DOI: `10.1093/nar/gkac261`.
+- Wang PY, Bartel DP. *Molecular Cell* (2024). The guide-RNA sequence dictates the slicing kinetics and conformational dynamics of the Argonaute silencing complex. DOI: `10.1016/j.molcel.2024.06.026`.
+- Cedden D et al. *BMC Biology* (2025). Optimizing dsRNA sequences for RNAi in pest control and research with the dsRIP web platform. DOI: `10.1186/s12915-025-02219-6`.
+- ViennaRNA Package 2.7.2 documentation: RNAplfold/local unpaired probabilities and RNAfold MFE prediction.
 
 ## 6. Reproducibility requirements
 
@@ -5952,7 +5604,12 @@ stage08_accessibility_parameter_sets = [
     ["W100_L80_sensitivity", 100, 80],
     ["W200_L150_sensitivity", 200, 150]
 ]
+stage08_seed_accessibility_guide_positions = [2, 8]
+stage08_terminal_thermo_model = "Zuber_2022"
+stage08_terminal_thermo_doi = "10.1093/nar/gkac261"
 stage08_asymmetry_terminal_lengths_nt = [4, 5]
+stage08_candidate_duplex_overhang_assumption = "none_perfect_complementary_duplex"
+stage08_self_fold_method = "ViennaRNA_RNAfold_MFE"
 steprna_passenger_range = [15, 30]
 steprna_sensitivity_range = [18, 28]
 transitivity_bin_size_nt = 10
@@ -6070,36 +5727,52 @@ Regression:
 
 ### Stage 08 generic candidate biophysics
 
+Input/accounting tests:
+
+- exact Stage 06 candidate accounting and zero candidate loss;
+- target interval equals the Stage 06 transcript slice;
+- antisense guide is the exact reverse complement of the target interval;
+- candidate length equals both candidate sequence lengths.
+
 Accessibility tests:
 
-- `_lunp` end-coordinate/interval-length indexing on a hand-checkable synthetic profile;
-- probability range 0–1;
-- one RNAplfold run per target × W/L parameter set;
-- exact Stage 06 candidate accounting;
-- correct extraction for arbitrary candidate lengths;
-- DNA/RNA transcript normalization inherited from the locked target;
-- W/L effective-value handling for transcripts shorter than requested W;
-- failure when requested unpaired length exceeds effective W;
-- exact min/max/range summaries.
+- whole-site accessibility is extracted for the exact complete candidate interval;
+- seed-side accessibility maps guide g2–g8 to target coordinates `[end_1based-7, end_1based-1]`;
+- RNAplfold coordinate/index semantics are verified on synthetic/hand-checkable examples;
+- all finite accessibility probabilities lie in `[0,1]`;
+- one transcript-level RNAplfold calculation is reused per transcript × parameter set;
+- primary and sensitivity W/L settings are recorded exactly;
+- short-transcript effective W/L rules are deterministic;
+- no pseudocount or Stage 08 log transform is introduced.
 
 Thermodynamic-asymmetry tests:
 
-- exact reverse-complement orientation;
-- guide 5′ end and passenger 5′ end identified correctly;
-- 4-bp feature = exactly 3 Turner stack terms;
-- 5-bp feature = exactly 4 Turner stack terms;
-- `ΔΔG = guide - passenger`;
-- positive sign means guide 5′ is less stable;
-- hand-calculated canonical Watson–Crick examples;
-- rejection of missing/non-finite/sentinel energies;
-- non-Vd-CHIBIN synthetic candidate regression.
+- exact Zuber-2022 Watson–Crick nearest-neighbour parameter resource is used;
+- guide 5′ and passenger 5′ physical ends are independently verified;
+- 4-bp terminal calculation contains exactly 3 NN stacks plus only the applicable outer physical-end correction;
+- 5-bp terminal calculation contains exactly 4 NN stacks plus only the applicable outer physical-end correction;
+- the inner subwindow boundary is never treated as a physical helix end;
+- no isolated-duplex initiation or symmetry term is added;
+- no RNAduplex/RNAcofold MFE optimization is substituted for the deterministic local-end calculation;
+- `asymmetry_ddg = guide_5p_terminal_dg - passenger_5p_terminal_dg`;
+- a synthetic weaker-guide/stronger-passenger example produces positive `asymmetry_ddg`;
+- no 2-nt or other Dicer overhang is imposed;
+- no infeasible/sentinel energy is accepted.
 
-Vd-CHIBIN accounting regression:
+Guide-self-folding tests:
 
-- 688 23-nt rows;
-- 687 24-nt rows;
-- 1,375 joined rows;
-- no candidate loss.
+- RNAfold/MFE input is exactly the Stage 06 antisense guide;
+- MFE is finite;
+- dot-bracket structure length equals candidate length;
+- no binary hairpin threshold or efficacy gate is created.
+
+Separation/non-scoring tests:
+
+- Stage 07 A3p3, 3p5–10 GC/AU, W17, R10, or other empirical values do not alter Stage 08 calculations;
+- 5-bp asymmetry is labelled sensitivity, not an independent score;
+- seed-side accessibility is labelled secondary, not a replacement for whole-site accessibility;
+- no Stage 08 percentile desirability transformation, weight, rank, gate, composite score, or candidate filtering is produced.
+
 
 ### Stage 06 generic target/candidate preparation
 
@@ -6231,7 +5904,7 @@ The first canonical viral pipeline is complete when:
 13. any deviation from historical results is surfaced explicitly rather than hidden;
 14. Stage 06 deterministically enumerates every requested candidate length for every registered transcript target without code changes per gene; the current Vd-CHIBIN fixture reproduces 688 23-nt + 687 24-nt = 1,375 rows without ranking or upstream viral analysis;
 15. Stage 07 reproduces the Stage 02 terminal landscape exactly while extending matched-background sequence association analysis to every 23/24-nt position and every fixed 6-nt regional-GC window, with literature-guided A10/GC9–14 validation, conservative dependent-test multiple-testing control, explicit pilot-discovery disclosure, and no efficacy/ranking claim;
-16. Stage 08 preserves every Stage 06 row while calculating only raw target-accessibility and duplex-end-asymmetry features, with no candidate filtering, scoring, ranking, or Stage 00–05 rerun.
+16. Stage 08 preserves every Stage 06 row while calculating only raw whole-site and g2–g8 seed-side target accessibility, Zuber-2022 duplex-end thermodynamic asymmetry, and antisense-guide self-folding features, with no imposed Dicer overhang, candidate filtering, scoring, ranking, or Stage 00–05 rerun.
 
 ---
 
@@ -6244,6 +5917,9 @@ The main methodological basis includes:
 - Phipson B, Smyth GK. 2010. *Permutation P-values Should Never Be Zero: Calculating Exact P-values When Permutations Are Randomly Drawn*. Statistical Applications in Genetics and Molecular Biology 9:Article 39.
 - Saravanan V, Berman GJ, Sober SJ. 2020. *Application of the hierarchical bootstrap to multi-level data in neuroscience*. Used here as general methodological support for respecting nested/clustered observations; the biological application in this project is different.
 - Damayo J et al. 2026 preprint, *Primary and secondary antiviral RNAi responses throughout Varroa destructor life stages reveal the vertical transmission of viruses*. This is biological motivation for the historical 23→24 hypothesis. Mechanistic claims must remain limited to what the available data directly support.
+- Ruijtenberg S et al. 2020. *mRNA structural dynamics shape Argonaute-target interactions*. Nature Structural & Molecular Biology. DOI: 10.1038/s41594-020-0461-1.
+- Zuber J et al. 2022. *Nearest neighbor rules for RNA helix folding thermodynamics: improved end effects*. Nucleic Acids Research 50:5251–5262. DOI: 10.1093/nar/gkac261.
+- Wang PY, Bartel DP. 2024. *The guide-RNA sequence dictates the slicing kinetics and conformational dynamics of the Argonaute silencing complex*. Molecular Cell. DOI: 10.1016/j.molcel.2024.06.026.
 - Cedden D, Güney G, Rostás M, Bucher G. 2025. *Optimizing dsRNA sequences for RNAi in pest control and research with the dsRIP web platform*. BMC Biology 23:114. DOI: 10.1186/s12915-025-02219-6. Used here as the external source for the A10 and continuous GC9–14 hypotheses; its insect efficacy results are not treated as Varroa validation.
 - Goh E, Okamura K. 2019. *Hidden sequence specificity in loading of single-stranded RNAs onto Drosophila Argonautes*. Nucleic Acids Research 47:3101–3116. DOI: 10.1093/nar/gky1300. Used as methodological precedent that positional/sequence composition can influence Argonaute-associated RNA populations; the present total-small-RNA data do not provide an equivalent AGO-loading assay.
 - Jayaprakash AD, Jabado O, Brown BD, Sachidanandam R. 2011. *Identification and remediation of biases in the activity of RNA ligases in small-RNA deep sequencing*. Nucleic Acids Research 39:e141. DOI: 10.1093/nar/gkr693. Supports the explicit library-preparation-bias limitation.

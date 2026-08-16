@@ -1,7 +1,7 @@
 # Varroa vsiRNA Metric Dictionary
 
-**Version:** 0.17  
-**Scope:** Canonical viral pipeline metrics through Stage 07 empirical single-nucleotide/regional-GC analysis and post-hoc feature synthesis, with Stage 08 candidate-biophysics metrics pre-specified
+**Version:** 0.18  
+**Scope:** Canonical metrics through Stage 07 empirical sequence-feature synthesis and pre-specified Stage 08 generic candidate biophysics (whole-site/seed-side accessibility, duplex-end asymmetry, and guide self-folding)
 
 ---
 
@@ -2615,7 +2615,7 @@ Stage 06 begins the design-facing pipeline with a generic transcript registry an
 
 Stage 07 is a separate empirical branch that extends the matched viral-background logic of Stage 02 across every physical nucleotide position of viral 23/24-nt small RNAs and across every fixed 6-nt regional-GC window. It tests literature-specified A10 and continuous GC9–14 hypotheses while allowing unbiased single-position A/C/G/T discovery and fixed-width local-GC discovery, with sample-balanced inference and conservative multiple-testing control. It measures representation/accumulation associations, not RNAi efficacy or proven AGO loading.
 
-Stage 08 then adds two raw predicted biophysical feature families to Stage 06 target candidates: RNAplfold full-interval target accessibility and guide-versus-passenger 5′ duplex-end thermodynamic asymmetry. These remain predictions and are not converted into efficacy scores or ranking weights until Stage 09.
+Stage 08 then adds raw predicted biophysical descriptors to Stage 06 target candidates: RNAplfold whole-site target accessibility, secondary g2–g8 seed-side accessibility, Zuber-2022 guide-versus-passenger 5′ duplex-end thermodynamic asymmetry, and isolated antisense-guide self-folding MFE. These remain predictions and are not converted into efficacy scores or ranking weights within Stage 08.
 
 ---
 
@@ -3475,428 +3475,717 @@ regional candidate rank
 ```
 
 
-## Stage 07 feature-synthesis definitions
 
-These post-hoc metrics summarize existing canonical Stage 07 outputs. They are evidence-management quantities, not independent validation, mechanistic proof, efficacy measures, or scoring terms. Unless stated otherwise, pair-level grouped metrics are aggregated by median across eligible viruses within each biological sample and then median across samples. The biological sample remains the top-level replicate.
+# 31. Stage 07 feature-synthesis definitions
 
-For every metric in this subsection:
+These definitions support the **post-hoc / literature-guided exploratory Stage 07 feature synthesis**. They manage evidence for later evaluation; they are not efficacy scores and do not alter the underlying canonical Stage 07 positional or regional calculations.
+
+Unless stated otherwise:
 
 ```text
-Stage 09 eligibility = evaluation only
+empirical_Varroa_feature = YES
+efficacy_measure = NO
+AGO_loading_measure = NO
 scoring_feature = NO
+ranking_feature = NO
+gate = NO
+candidate_removal = NO
 ```
 
-No weight, point, bonus, penalty, rank, or pseudocount is defined.
+## `guide_position_5p`
 
-### `guide_position_5p`
-
-**Class:** Physical guide coordinate  
-**Definition:** One-based position counted from the physical sequenced guide 5′ end.  
-**Unit:** nucleotide position  
-**Direction/interpretation:** Increases from guide 5′ to 3′.  
-**Aggregation:** Identifier; not aggregated.  
-**Evidence class:** Coordinate metadata.  
-**Limitation:** Does not imply a mechanistic cleavage or loading coordinate.
-
-### `guide_position_3p`
-
-**Class:** Derived physical guide coordinate  
-**Definition:** `guide_length_nt - guide_position_5p + 1`.  
-**Unit:** nucleotide position from the physical guide 3′ end  
-**Direction/interpretation:** `1` is 3p1; 23-nt position 21 and 24-nt position 22 are both 3p3.  
-**Aggregation:** Identifier; not aggregated.  
-**Evidence class:** Coordinate metadata.  
-**Limitation:** It is an alternative label for the same physical nucleotide, not a separate hypothesis.
-
-### `a3p3_indicator`
-
-**Class:** Compact guide-sequence feature  
-**Definition:** `1` when the physical guide 3p3 nucleotide is A; otherwise `0`.  
-**Unit:** binary indicator  
-**Direction/interpretation:** Higher values denote A at 3p3 only.  
-**Aggregation:** Candidate-level feature eligible for later evaluation.  
-**Evidence class:** Compact Varroa cross-length positional discovery.  
-**Limitation:** Association in total small-RNA data does not establish AGO loading or efficacy.
-
-### `w7_indicator`
-
-**Class:** Literature-guided grouped guide feature  
-**Definition:** `1` when physical guide position 7 is A or U; otherwise `0`. Canonical DNA-form TSV representation uses A or T.  
-**Unit:** binary indicator  
-**Direction/interpretation:** Presence of W7; no favourable direction is assumed for Varroa.  
-**Aggregation:** Candidate-level feature eligible only if retained after evidence synthesis.  
-**Evidence class:** `wang_bartel_2024_exploratory`.  
-**Limitation:** The external rationale is not independent validation in this dataset.
-
-### `r10_indicator`
-
-**Class:** Literature-guided grouped guide feature  
-**Definition:** `1` when physical guide position 10 is A or G; otherwise `0`.  
-**Unit:** binary indicator  
-**Direction/interpretation:** Presence of R10; representation and accumulation remain distinct evidence endpoints.  
-**Aggregation:** Candidate-level feature eligible for later evaluation.  
-**Evidence class:** `wang_bartel_2024_exploratory`.  
-**Limitation:** Positive representation is not equivalent to efficacy or disproportionate accumulation.
-
-### `w17_indicator`
-
-**Class:** Literature-guided grouped guide feature  
-**Definition:** `1` when physical guide position 17 is A or U; otherwise `0`. Canonical DNA-form TSV representation uses A or T.  
-**Unit:** binary indicator  
-**Direction/interpretation:** Presence of W17.  
-**Aggregation:** Candidate-level feature eligible for later evaluation.  
-**Evidence class:** `wang_bartel_2024_exploratory`.  
-**Limitation:** Total-small-RNA accumulation does not prove the proposed external mechanism.
-
-### `guide_gc_3p5_10`
-
-**Class:** Regional guide-composition feature  
-**Definition:** Number of G/C nucleotides across physical guide positions 3p5 through 3p10 divided by `6`.  
-**Unit:** fraction  
-**Direction/interpretation:** Higher values are more GC-rich; lower values are more AU-rich.  
-**Aggregation:** Candidate-level continuous feature eligible for later evaluation.  
-**Evidence class:** Fixed-width regional-GC synthesis.  
-**Limitation:** Overlapping regional and positional features are dependent and require redundancy evaluation.
-
-### `guide_au_3p5_10`
-
-**Class:** Regional guide-composition feature  
-**Definition:** `1 - guide_gc_3p5_10` for a valid A/C/G/U guide sequence.  
-**Unit:** fraction  
-**Direction/interpretation:** Higher values are more AU-rich.  
-**Aggregation:** Candidate-level continuous feature eligible for later evaluation.  
-**Evidence class:** Fixed-width regional-GC synthesis.  
-**Limitation:** It is exactly complementary to `guide_gc_3p5_10` and must not be treated as independent evidence.
-
-### `grouped_observed_fraction`
-
-**Class:** Pair-level grouped observed composition  
-**Definition:** Sum of the canonical Stage 07 observed fractions for all nucleotides belonging to the specified group at one physical position.  
-**Unit:** fraction  
-**Direction/interpretation:** Larger values mean the group occupies more of the observed population under the stated weighting mode.  
-**Aggregation:** Calculated per sample-virus before sample/dataset medians.  
-**Evidence class:** Grouped feature evidence.  
-**Limitation:** Unique-sequence and abundance modes are separate populations.
-
-### `grouped_expected_fraction`
-
-**Class:** Pair-level grouped matched-background composition  
-**Definition:** Sum of the corresponding matched viral-window expected fractions for all constituent nucleotides.  
-**Unit:** fraction  
-**Direction/interpretation:** Larger values mean more matched viral sequence opportunity for the group.  
-**Aggregation:** Calculated per sample-virus before sample/dataset medians.  
-**Evidence class:** Matched-background expectation.  
-**Limitation:** It corrects viral sequence opportunity, not library-preparation bias.
-
-### `grouped_representation_enrichment`
-
-**Class:** Pair-level grouped representation ratio  
-**Definition:** `grouped_observed_fraction / grouped_expected_fraction`; `NA` when the expected fraction is zero or undefined.  
-**Unit:** ratio  
-**Direction/interpretation:** Above `1` is over-representation; below `1` is under-representation relative to matched opportunity.  
-**Aggregation:** Pair metric → within-sample median → across-sample median.  
-**Evidence class:** Representation association.  
-**Limitation:** No pseudocount; not an efficacy fold-change.
-
-### `grouped_representation_delta`
-
-**Class:** Pair-level grouped representation difference  
-**Definition:** `grouped_observed_fraction - grouped_expected_fraction`.  
-**Unit:** fraction / percentage-point composition difference  
-**Direction/interpretation:** Positive is observed excess; negative is observed depletion.  
-**Aggregation:** Pair metric → within-sample median → across-sample median.  
-**Evidence class:** Representation association and sign-test endpoint.  
-**Limitation:** Does not identify the biological cause of representation.
-
-### `grouped_accumulation_ratio`
-
-**Class:** Pair-level grouped accumulation ratio  
-**Definition:** Abundance-weighted grouped observed fraction divided by unique-sequence grouped observed fraction; `NA` when the unique denominator is zero or undefined.  
-**Unit:** ratio  
-**Direction/interpretation:** Above `1` means the group contributes disproportionate abundance relative to observed sequence diversity.  
-**Aggregation:** Pair metric → within-sample median → across-sample median.  
-**Evidence class:** Accumulation association.  
-**Limitation:** Not RNAi efficacy and not molecular abundance relative to an external standard.
-
-### `grouped_accumulation_delta`
-
-**Class:** Pair-level grouped accumulation difference  
-**Definition:** Abundance-weighted grouped observed fraction minus unique-sequence grouped observed fraction.  
-**Unit:** fraction / percentage-point composition difference  
-**Direction/interpretation:** Positive denotes disproportionate high-copy representation; negative denotes depletion among high-copy sequences.  
-**Aggregation:** Pair metric → within-sample median → across-sample median.  
-**Evidence class:** Accumulation association and sign-test endpoint.  
-**Limitation:** Does not establish stability, loading, slicing, or efficacy.
-
-### `cross_length_same_3p`
-
-**Class:** Descriptive cross-length evidence relation  
-**Definition:** Links 23-nt and 24-nt single-nucleotide results with the same physical 3′-relative coordinate, nucleotide, and endpoint. An internal supported match additionally requires concordant effect direction and existing `BY < 0.05` in both lengths.  
-**Unit:** paired evidence record  
-**Direction/interpretation:** Describes cross-length concordance without creating a combined score.  
-**Aggregation:** Across-dataset Stage 07 summary rows.  
-**Evidence class:** Post-hoc positional synthesis.  
-**Limitation:** Terminal positions retain their existing terminal-analysis status and do not enter a new discovery family.
-
-### `cross_length_same_5p`
-
-**Class:** Descriptive cross-length evidence relation  
-**Definition:** Links 23-nt and 24-nt single-nucleotide results with the same physical 5′-relative coordinate, nucleotide, and endpoint, using the same internal-support rule as `cross_length_same_3p`.  
-**Unit:** paired evidence record  
-**Direction/interpretation:** Describes cross-length concordance without creating a combined score.  
-**Aggregation:** Across-dataset Stage 07 summary rows.  
-**Evidence class:** Post-hoc positional synthesis.  
-**Limitation:** The 5′ and 3′ tables are alternative coordinate alignments, not independent tests.
-
-### `feature_evidence_status`
-
-**Class:** Evidence-management category  
-**Allowed values:** `CARRY_FORWARD_HIGH`, `CARRY_FORWARD_SUPPORTIVE`, `CONTEXT_ONLY`, `NOT_DEFAULT`.  
-**Definition:** Rule-derived qualitative status based on corrected cross-length evidence, endpoint, external-prior metadata, and whether the feature is compact or broad.  
-**Unit:** categorical  
-**Direction/interpretation:** Controls eligibility for later evaluation, not magnitude or quality on a numerical scale.  
-**Aggregation:** One record per predefined synthesis feature group.  
-**Evidence class:** Post-hoc evidence synthesis.  
-**Limitation:** Categories are not weights, scores, ranks, or independent validation.
-
-### `stage09_default_include`
-
-**Class:** Later-evaluation eligibility flag  
-**Definition:** `TRUE` only when `feature_evidence_status` is `CARRY_FORWARD_HIGH` or `CARRY_FORWARD_SUPPORTIVE`; otherwise `FALSE`.  
-**Unit:** Boolean  
-**Direction/interpretation:** `TRUE` permits explicit Stage 09 evaluation of correlation, redundancy, antagonism, and incremental information.  
-**Aggregation:** One flag per predefined synthesis feature group.  
-**Evidence class:** Evidence-management decision.  
-**Limitation:** It does not accept a feature as a scoring term or assign any weight.
-
-
-# 31. Stage 08 generic candidate-biophysics definitions
-
-Stage 08 adds raw predictive biophysical features only.
-
-It does not define candidate efficacy, rank or aggregate score.
-
-## `accessibility_p_W150_L100`
-
-**Class:** Primary predicted target-accessibility feature
-
-For a candidate transcript interval:
+Physical guide coordinate counted from the guide 5′ end:
 
 ```text
-P(
-  every nucleotide in the complete candidate interval
-  is simultaneously unpaired
-)
+1 ... guide_length
 ```
 
-under RNAplfold with requested:
+For Stage 07 observed antisense RNAs, this is the physical sequenced orientation and no reverse complement is applied.
+
+This is equivalent to the canonical positional-analysis `position_5p` coordinate when applied to the guide.
+
+## `guide_position_3p`
+
+Physical guide coordinate counted from the guide 3′ end:
 
 ```text
-W = 150
-L = 100
-T = 37 °C
+guide_position_3p
+=
+guide_length - guide_position_5p + 1
 ```
 
-using the effective-W/L rules in the pipeline specification for short transcripts.
+Thus:
+
+```text
+23 nt position 21 = 3p3
+24 nt position 22 = 3p3
+```
+
+## `a3p3_indicator`
+
+Boolean sequence feature:
+
+```text
+1 if the nucleotide at physical guide 3p3 is A
+0 otherwise
+```
+
+**Evidence origin:** Varroa-discovered empirical positional association.
+
+**Interpretation:** identifies the compact cross-length A-at-3p3 feature. It does not imply efficacy or AGO loading.
+
+**Stage 09 eligibility:** YES; `scoring_feature = NO`.
+
+## `w7_indicator`
+
+Boolean Wang/Bartel feature:
+
+```text
+1 if physical guide position 7 is A or U
+0 otherwise
+```
+
+Canonical DNA-alphabet Stage 07 TSV implementation uses `{A,T}`.
+
+**Evidence origin:** external mechanistic prior from Wang & Bartel 2024, evaluated post-hoc in the Varroa Stage 07 population.
+
+**Stage 07 synthesis status after canonical calculation:** `NOT_DEFAULT`.
+
+**Stage 09 default include:** FALSE.
+
+## `r10_indicator`
+
+Boolean Wang/Bartel feature:
+
+```text
+1 if physical guide position 10 is A or G
+0 otherwise
+```
+
+**Evidence origin:** external mechanistic prior from Wang & Bartel 2024 plus Varroa representation evidence.
+
+**Stage 07 synthesis status after canonical calculation:** `CARRY_FORWARD_SUPPORTIVE`.
+
+**Stage 09 default include:** TRUE, subject to Stage 09 redundancy/incremental-information analysis.
+
+## `w17_indicator`
+
+Boolean Wang/Bartel feature:
+
+```text
+1 if physical guide position 17 is A or U
+0 otherwise
+```
+
+Canonical DNA-alphabet Stage 07 TSV implementation uses `{A,T}`.
+
+**Evidence origin:** external mechanistic prior from Wang & Bartel 2024 plus positive Varroa antisense accumulation support in both 23- and 24-nt populations.
+
+**Stage 07 synthesis status after canonical calculation:** `CARRY_FORWARD_HIGH`.
+
+**Stage 09 default include:** TRUE, subject to Stage 09 redundancy/incremental-information analysis.
+
+## `guide_gc_3p5_10`
+
+Continuous guide-composition feature:
+
+```text
+guide_gc_3p5_10
+=
+number of G/C nucleotides across physical guide positions 3p5 through 3p10
+/
+6
+```
 
 Range:
 
 ```text
-0 <= accessibility_p_W150_L100 <= 1
+0, 1/6, 2/6, 3/6, 4/6, 5/6, 1
 ```
 
-Higher means more predicted complete-interval accessibility.
-
-The sequence being folded is the **target transcript**, not the antisense guide.
-
-## `accessibility_p_W100_L80`
-
-**Class:** Accessibility sensitivity feature
-
-Same definition using:
+Coordinate correspondence:
 
 ```text
-W = 100
-L = 80
+23 nt -> positions 14–19
+24 nt -> positions 15–20
 ```
 
-This is a modelling sensitivity value, not an independent biological replicate.
+Lower values mean greater AU richness in this six-nucleotide region.
 
-## `accessibility_p_W200_L150`
+**Evidence origin:** Varroa-discovered fixed-width regional accumulation association.
 
-**Class:** Accessibility sensitivity feature
+**Stage 07 synthesis status after canonical calculation:** `CARRY_FORWARD_HIGH`.
 
-Same definition using:
+**Stage 09 default include:** TRUE, subject to redundancy analysis.
 
-```text
-W = 200
-L = 150
-```
+## `guide_au_3p5_10`
 
-## `accessibility_p_min`
-
-**Class:** Descriptive robustness summary
+For valid A/C/G/U guide sequence:
 
 ```text
-min(
-    accessibility_p_W150_L100,
-    accessibility_p_W100_L80,
-    accessibility_p_W200_L150
-)
-```
-
-No percentile transformation is applied in Stage 08.
-
-## `accessibility_p_max`
-
-**Class:** Descriptive robustness summary
-
-Maximum accessibility probability across enabled W/L models.
-
-## `accessibility_p_range`
-
-**Class:** Descriptive model-sensitivity summary
-
-```text
-accessibility_p_max - accessibility_p_min
-```
-
-A larger value indicates greater sensitivity to the chosen local folding context.
-
-It is not a biological uncertainty interval.
-
-## Cross-length accessibility rule
-
-Full-interval accessibility probabilities depend on interval length.
-
-Therefore:
-
-```text
-P_unpaired(23 nt)
-```
-
-and:
-
-```text
-P_unpaired(24 nt)
-```
-
-must not automatically be compared as if they were on an identical efficacy scale.
-
-Any normalization or cross-length score belongs in Stage 09.
-
----
-
-## `guide_5p_stack_dg_4bp_kcal_mol`
-
-**Class:** Raw terminal duplex-stability feature
-
-Sum of the three canonical RNA/RNA nearest-neighbour stacking ΔG°37 terms across the first four paired nucleotides at the 5′ end of the antisense guide.
-
-Units:
-
-```text
-kcal/mol
-```
-
-More negative means a more stable local paired end.
-
-This is a stack-only quantity, not complete duplex formation free energy.
-
-## `passenger_5p_stack_dg_4bp_kcal_mol`
-
-Analogous three-stack sum at the 5′ end of the passenger/sense strand.
-
-## `asymmetry_ddg_4bp_kcal_mol`
-
-**Class:** Primary terminal-asymmetry feature
-
-```text
-asymmetry_ddg_4bp_kcal_mol
+guide_au_3p5_10
 =
-guide_5p_stack_dg_4bp_kcal_mol
--
-passenger_5p_stack_dg_4bp_kcal_mol
+1 - guide_gc_3p5_10
 ```
+
+This is mathematically redundant with `guide_gc_3p5_10` and must not be treated as independent evidence or independently weighted.
+
+## `grouped_observed_fraction`
+
+For a grouped nucleotide feature such as W7, R10, or W17, within one sample-virus unit:
+
+```text
+grouped_observed_fraction
+=
+sum(observed_fraction for all constituent nucleotides)
+```
+
+Examples:
+
+```text
+W7  = fraction(A at g7) + fraction(U at g7)
+R10 = fraction(A at g10) + fraction(G at g10)
+W17 = fraction(A at g17) + fraction(U at g17)
+```
+
+Grouping is performed at the sample-virus level **before** sample aggregation.
+
+## `grouped_expected_fraction`
+
+Matched viral-opportunity analogue:
+
+```text
+grouped_expected_fraction
+=
+sum(expected_fraction for all constituent nucleotides)
+```
+
+The same matched background and orientation rules as canonical Stage 07 apply.
+
+## `grouped_representation_enrichment`
+
+```text
+grouped_representation_enrichment
+=
+grouped_observed_fraction
+/
+grouped_expected_fraction
+```
+
+when the expected denominator is positive.
 
 Interpretation:
 
 ```text
-> 0
-desired antisense-guide 5′ end is less stably paired
-
-= 0
-equal stack-only terminal stability under this model
-
-< 0
-desired antisense-guide 5′ end is more stably paired
+>1  grouped feature is over-represented relative to matched viral opportunity
+=1  matches opportunity
+<1  under-represented
 ```
 
-A positive value is directionally consistent with the classical thermodynamic-asymmetry tendency for guide selection, but it is not a Varroa-specific loading probability.
+No pseudocount.
 
-## `guide_5p_stack_dg_5bp_kcal_mol`
-
-**Class:** Terminal-length sensitivity feature
-
-Sum of four nearest-neighbour stack terms across the first five paired nucleotides at the guide 5′ end.
-
-## `passenger_5p_stack_dg_5bp_kcal_mol`
-
-Analogous four-stack sum at the passenger 5′ end.
-
-## `asymmetry_ddg_5bp_kcal_mol`
+## `grouped_representation_delta`
 
 ```text
-guide_5p_stack_dg_5bp_kcal_mol
+grouped_representation_delta
+=
+grouped_observed_fraction
 -
-passenger_5p_stack_dg_5bp_kcal_mol
+grouped_expected_fraction
 ```
 
-with the same sign convention as the 4-bp primary feature.
+Used as the zero-safe sample-level paired difference for sign-test inference.
 
-## `asymmetry_direction_4bp`
-
-**Class:** Descriptive categorical annotation
+## `grouped_accumulation_ratio`
 
 ```text
-guide_5p_less_stable
-equal_within_numeric_tol
-guide_5p_more_stable
+grouped_accumulation_ratio
+=
+grouped_observed_fraction_abundance
+/
+grouped_observed_fraction_unique
 ```
 
-according to `asymmetry_ddg_4bp_kcal_mol`.
+when the unique denominator is positive.
 
-## `asymmetry_direction_5bp`
-
-Same annotation for the 5-bp sensitivity feature.
-
-## `asymmetry_direction_consistent`
-
-**Class:** Descriptive robustness annotation
-
-Indicates whether the 4-bp and 5-bp calculations support the same non-zero direction.
-
-This is not a gate.
-
-## Stage 08 non-metrics
-
-The following remain deliberately undefined:
+Interpretation:
 
 ```text
-A accessibility score
-T thermodynamic score
-N empirical-enrichment score
-S aggregate score
-asymmetry pass/fail gate
-candidate rank
-target-window score
+>1  grouped feature is disproportionately represented among high-copy observed RNAs
+=1  abundance matches prevalence among distinct observed sequences
+<1  relatively depleted among high-copy observed RNAs
 ```
 
-The earlier 0.70/0.30 and 0.60/0.30/0.10 formulas are historical design choices and are not canonical Stage 08 definitions.
+This is not an efficacy fold-change.
+
+## `grouped_accumulation_delta`
+
+```text
+grouped_accumulation_delta
+=
+grouped_observed_fraction_abundance
+-
+grouped_observed_fraction_unique
+```
+
+Used for zero-safe sample-level inference.
+
+## `wang_bartel_2024_exploratory`
+
+Evidence-family label for the post-hoc W7/R10/W17 grouped-feature analysis.
+
+Antisense inferential family:
+
+```text
+3 grouped features × 2 lengths × 3 endpoints = 18 tests
+```
+
+The primary reported multiple-testing adjustment for this family is BH across exactly those 18 antisense tests. Sense is a descriptive comparator and is not included in that family.
+
+Because the dataset had already been inspected, this is **literature-guided exploratory evidence**, not independent replication.
+
+## `cross_length_same_3p`
+
+Cross-length evidence relation requiring the same:
+
+- nucleotide;
+- endpoint;
+- physical 3′-relative coordinate;
+- effect direction;
+
+and, for internal positional discoveries, existing `BY < 0.05` support in both 23- and 24-nt populations.
+
+It is a synthesis relation, not a numeric biological score.
+
+## `cross_length_same_5p`
+
+Equivalent relation using the same physical 5′-relative coordinate across 23- and 24-nt populations.
+
+It is a synthesis relation, not a numeric biological score.
+
+## `feature_evidence_status`
+
+Categorical evidence-management field with allowed values:
+
+```text
+CARRY_FORWARD_HIGH
+CARRY_FORWARD_SUPPORTIVE
+CONTEXT_ONLY
+NOT_DEFAULT
+```
+
+These categories are **not scores, weights, bonuses, penalties, ranks, probabilities, or efficacy classes**.
+
+### `CARRY_FORWARD_HIGH`
+
+Used when the same biologically corresponding feature/coordinate/region has concordant direction and corrected accumulation support in both 23 and 24 nt, together with either an external mechanistic rationale or a clear compact Varroa cross-length discovery.
+
+### `CARRY_FORWARD_SUPPORTIVE`
+
+Used when a strong external mechanistic rationale and corrected positive Varroa representation are present in both lengths, but accumulation evidence is not convincingly supported in both lengths.
+
+### `CONTEXT_ONLY`
+
+Used for reproducible broad exploratory structure that is not yet a compact independent feature and may be compositionally redundant.
+
+### `NOT_DEFAULT`
+
+Used when an externally predicted favourable feature lacks positive Varroa support in at least one length and/or shows corrected evidence in the opposite direction.
+
+## `stage09_default_include`
+
+Boolean evidence-management field:
+
+```text
+TRUE
+FALSE
+```
+
+`TRUE` means only:
+
+> eligible for explicit Stage 09 evaluation by default.
+
+It does **not** mean:
+
+- accepted scoring feature;
+- favourable bonus;
+- mandatory feature;
+- independent information;
+- validated efficacy determinant.
+
+Canonical post-hoc Stage 07 synthesis currently carries forward by default:
+
+```text
+A3p3
+guide 3p5–10 GC/AU composition
+W17
+R10
+```
+
+while:
+
+```text
+early/central G-rich pattern -> CONTEXT_ONLY
+W7 -> NOT_DEFAULT
+```
+
+Stage 09 must evaluate correlation, redundancy, antagonism, and incremental information before any feature is combined or weighted.
 
 ---
 
-# 32. Metrics deliberately not yet defined
+# 32. Stage 08 generic candidate-biophysics definitions
+
+### Common metadata for all Stage 08 metrics
+
+Unless stated otherwise:
+
+- **level:** candidate
+- **input orientation:** target transcript is mature/spliced RNA 5′→3′; antisense guide is the exact reverse complement 5′→3′
+- **current canonical candidate lengths:** 23 nt and 24 nt
+- **target-specific:** NO; generic across Stage 06 targets
+- **Vd-CHIBIN hard-coded:** NO
+- **empirical Varroa feature:** NO
+- **efficacy measurement:** NO
+- **scoring feature in Stage 08:** NO
+- **ranking feature in Stage 08:** NO
+- **gate/filter in Stage 08:** NO
+- **candidate removal:** NO
+- **eligible for later evaluation:** YES unless noted
+
+---
+
+### `target_whole_p_unpaired`
+
+**Definition**  
+Probability, under the primary RNAplfold local structural ensemble, that every nucleotide in the exact Stage 06 target interval `[start_1based, end_1based]` is simultaneously unpaired.
+
+**Primary parameters**  
+ViennaRNA 2.7.2; 37 °C; RNAplfold `W=150`, `L=100`, `u >= max(candidate_length_nt)`.
+
+**Unit / range**  
+Probability, `[0,1]`.
+
+**Direction**  
+Higher = greater predicted intrinsic whole-site accessibility.
+
+**Interpretation**  
+Structural accessibility descriptor only. It is not measured accessibility and does not directly quantify AGO binding or RNAi efficacy.
+
+**Length dependence**  
+YES. Probability of a 24-nt interval being simultaneously unpaired is not directly equivalent to the corresponding 23-nt probability.
+
+**Pseudocount**  
+NONE. Zero is valid.
+
+**Stage 08 status**  
+Primary accessibility metric; `scoring_feature = NO`.
+
+**Limitations**  
+Local equilibrium prediction; does not model translation-driven target unmasking, RNA-binding proteins, RNA modification, or other in-cell dynamics.
+
+---
+
+### `target_whole_p_unpaired_w100_l80`
+
+**Definition**  
+Same interval and probability definition as `target_whole_p_unpaired`, using RNAplfold robustness parameters `W=100`, `L=80`.
+
+**Unit / direction**  
+Probability `[0,1]`; higher = more predicted accessible.
+
+**Status**  
+Sensitivity/robustness metric only; not an independent scoring feature.
+
+---
+
+### `target_whole_p_unpaired_w200_l150`
+
+**Definition**  
+Same interval and probability definition as `target_whole_p_unpaired`, using RNAplfold robustness parameters `W=200`, `L=150`.
+
+**Unit / direction**  
+Probability `[0,1]`; higher = more predicted accessible.
+
+**Status**  
+Sensitivity/robustness metric only; not an independent scoring feature.
+
+---
+
+### `target_seed_g2_8_p_unpaired`
+
+**Definition**  
+Probability, under the primary RNAplfold local structural ensemble, that the seven target nucleotides complementary to guide positions g2–g8 are simultaneously unpaired.
+
+For candidate target end coordinate `e = end_1based`:
+
+`target_seed_g2_8_interval = [e-7, e-1]`
+
+because guide g1 pairs target `e`, guide g2 pairs `e-1`, and guide g8 pairs `e-7`.
+
+**Unit / range**  
+Probability, `[0,1]`.
+
+**Direction**  
+Higher = greater predicted accessibility of the target-side seed-recognition interval.
+
+**Role**  
+Secondary local accessibility descriptor.
+
+**Status**  
+`scoring_feature = NO`.
+
+**Generic-length rule**  
+For candidate lengths <8 nt, NA with an explicit QC/info reason. Current canonical 23/24-nt candidates are eligible.
+
+**Limitations**  
+The g2–g8 interval is a mechanistically motivated AGO seed-recognition region; this metric does not assert that seed accessibility alone determines slicing or efficacy.
+
+---
+
+### `target_seed_g2_8_p_unpaired_w100_l80`
+
+**Definition**  
+Same g2–g8 target interval as `target_seed_g2_8_p_unpaired`, using RNAplfold `W=100`, `L=80`.
+
+**Unit / direction**  
+Probability `[0,1]`; higher = more predicted accessible.
+
+**Status**  
+Sensitivity/robustness metric only.
+
+---
+
+### `target_seed_g2_8_p_unpaired_w200_l150`
+
+**Definition**  
+Same g2–g8 target interval as `target_seed_g2_8_p_unpaired`, using RNAplfold `W=200`, `L=150`.
+
+**Unit / direction**  
+Probability `[0,1]`; higher = more predicted accessible.
+
+**Status**  
+Sensitivity/robustness metric only.
+
+---
+
+### `guide_5p_terminal_dg_4bp`
+
+**Definition**  
+Local predicted ΔG°37 contribution for the first four paired nucleotides at the physical 5′ end of the antisense guide in the idealized perfectly complementary guide/passenger duplex.
+
+For guide g1–g4:
+
+`guide_5p_terminal_dg_4bp = sum of the 3 Zuber-2022 Watson–Crick nearest-neighbour stack increments + applicable Zuber-2022 sequence-dependent correction at the actual outer physical helix end`
+
+The inner edge of the 4-bp subwindow is not treated as a helix end because the duplex continues beyond g4.
+
+**Parameter source**  
+Zuber et al. 2022, NAR, DOI `10.1093/nar/gkac261`; exact constants stored in a tracked project resource table.
+
+**Unit**  
+kcal/mol at 37 °C.
+
+**Direction**  
+More negative = locally more stable guide 5′ duplex end.
+
+**Important exclusion**  
+No isolated-duplex initiation term; no symmetry term; no imposed Dicer overhang.
+
+**Status**  
+Component metric; `scoring_feature = NO`.
+
+---
+
+### `passenger_5p_terminal_dg_4bp`
+
+**Definition**  
+Equivalent local predicted ΔG°37 contribution for the first four paired nucleotides at the physical 5′ end of the passenger/sense strand. This end is opposite guide positions 3p1–3p4.
+
+Calculation uses the same Zuber-2022 stack and physical-end rules as `guide_5p_terminal_dg_4bp`.
+
+**Unit**  
+kcal/mol at 37 °C.
+
+**Direction**  
+More negative = locally more stable passenger 5′ duplex end.
+
+**Status**  
+Component metric; `scoring_feature = NO`.
+
+---
+
+### `asymmetry_ddg_4bp`
+
+**Definition**  
+Primary Stage 08 duplex-end thermodynamic asymmetry descriptor:
+
+`asymmetry_ddg_4bp = guide_5p_terminal_dg_4bp - passenger_5p_terminal_dg_4bp`
+
+**Unit**  
+kcal/mol.
+
+**Direction / sign convention**  
+- positive: guide 5′ end is relatively less stable than passenger 5′ end; classical guide-favouring strand-selection direction;
+- zero: equal local end stability;
+- negative: guide 5′ end is relatively more stable; opposite classical direction.
+
+**Evidence class**  
+Mechanistically motivated biophysical descriptor with classic RNAi strand-selection support and insect-specific efficacy/RISC association in Cedden et al. 2025.
+
+**Overhang treatment**  
+NONE. Candidate duplex is treated as fully complementary with no imposed Dicer offset or 2-nt overhang.
+
+**Status**  
+Primary asymmetry metric; `scoring_feature = NO`, `gate = NO`.
+
+**Limitations**  
+Not a calibrated Varroa loading probability or efficacy scale. It is an idealized perfect-duplex end-stability comparison.
+
+---
+
+### `guide_5p_terminal_dg_5bp`
+
+**Definition**  
+Five-paired-nucleotide analogue of `guide_5p_terminal_dg_4bp`: four NN stack increments plus the applicable correction at the actual outer physical helix end.
+
+**Unit / direction**  
+kcal/mol; more negative = more stable guide 5′ end.
+
+**Status**  
+Sensitivity component only.
+
+---
+
+### `passenger_5p_terminal_dg_5bp`
+
+**Definition**  
+Five-paired-nucleotide analogue of `passenger_5p_terminal_dg_4bp`.
+
+**Unit / direction**  
+kcal/mol; more negative = more stable passenger 5′ end.
+
+**Status**  
+Sensitivity component only.
+
+---
+
+### `asymmetry_ddg_5bp`
+
+**Definition**  
+`guide_5p_terminal_dg_5bp - passenger_5p_terminal_dg_5bp`.
+
+**Unit**  
+kcal/mol.
+
+**Direction**  
+Same sign convention as `asymmetry_ddg_4bp`; more positive = guide 5′ relatively less stable.
+
+**Status**  
+Sensitivity/robustness asymmetry metric, not an independent Stage 08 feature and not a scoring term.
+
+---
+
+### `guide_self_fold_mfe_kcal_mol`
+
+**Definition**  
+Minimum free energy of the isolated Stage 06 antisense guide sequence, predicted by ViennaRNA 2.7.2 RNAfold-equivalent MFE calculation at 37 °C.
+
+**Input**  
+Exactly `antisense_guide_sequence_rna`; no flanking target sequence and no passenger strand.
+
+**Unit**  
+kcal/mol.
+
+**Direction**  
+More negative = more stable predicted guide self-structure. Values closer to zero = weaker predicted self-folding.
+
+**Evidence class**  
+Predicted guide-structure descriptor; weaker antisense secondary structure was associated with higher insecticidal efficacy in Cedden et al. 2025.
+
+**Length dependence**  
+YES; downstream comparisons should account for 23/24-nt length.
+
+**Status**  
+Primary self-folding metric; `scoring_feature = NO`, `gate = NO`.
+
+**Limitations**  
+MFE describes one minimum-energy structure, not the full guide structural ensemble and not the structure of AGO-bound guide RNA.
+
+---
+
+### `guide_self_fold_structure`
+
+**Definition**  
+Dot-bracket representation of the MFE structure corresponding to `guide_self_fold_mfe_kcal_mol`.
+
+**Unit**  
+Dot-bracket string of length `candidate_length_nt`.
+
+**Direction**  
+None; descriptive/audit field.
+
+**Status**  
+Provenance/interpretability field; not eligible as a direct numeric scoring feature.
+
+---
+
+## Stage 08 provenance / parameter fields
+
+The implementation should expose the following provenance fields in `stage08_parameters.tsv` rather than silently relying on environment defaults:
+
+### `viennarna_version`
+Exact ViennaRNA version. Canonical Stage 08 value: `2.7.2`.
+
+### `temperature_c`
+Thermodynamic temperature for ViennaRNA structural calculations. Canonical value: `37.0`.
+
+### `rnaplfold_window_nt`
+Requested RNAplfold local window size W for each parameter set.
+
+### `rnaplfold_max_bp_span_nt`
+Requested RNAplfold maximum base-pair span L for each parameter set.
+
+### `rnaplfold_ulength_nt`
+Maximum unpaired interval length requested from RNAplfold; must be at least the maximum candidate length and at least 7.
+
+### `rnaplfold_effective_window_nt`
+Transcript-specific effective W after short-transcript adjustment.
+
+### `rnaplfold_effective_max_bp_span_nt`
+Transcript-specific effective L after short-transcript adjustment.
+
+### `terminal_thermo_parameter_source`
+Canonical value identifying Zuber et al. 2022, DOI `10.1093/nar/gkac261`.
+
+### `terminal_thermo_parameter_resource`
+Tracked project resource file containing the exact NN/end constants used by the implementation.
+
+### `candidate_duplex_overhang_assumption`
+Canonical value: `none_perfect_complementary_duplex`.
+
+---
+
+## Stage 08 interpretation rules
+
+1. Stage 08 quantities are **raw predicted physical descriptors**.
+2. No Stage 08 metric is converted to a percentile, rank, normalized desirability score, pass/fail gate, or weighted composite within Stage 08.
+3. `target_whole_p_unpaired` and guide self-fold MFE are length-dependent; 23- and 24-nt candidates must not be treated as directly interchangeable scales without downstream length handling.
+4. `target_seed_g2_8_p_unpaired` is secondary and does not supersede whole-site accessibility.
+5. `asymmetry_ddg_5bp` is a sensitivity check for `asymmetry_ddg_4bp`, not a second independent feature.
+6. Empirical Stage 07 features such as A3p3, 3p5–10 GC/AU, W17 and R10 must not alter Stage 08 calculations.
+7. Any later analysis of redundancy, correlation, antagonism, incremental information, or feature weighting is outside Stage 08.
+
+## Academic references
+
+- Schwarz DS et al. *Cell* 2003. DOI `10.1016/S0092-8674(03)00759-1`.
+- Tomari Y et al. *Science* 2004. DOI `10.1126/science.1102755`.
+- Ruijtenberg S et al. *Nat Struct Mol Biol* 2020. DOI `10.1038/s41594-020-0461-1`.
+- Zuber J et al. *Nucleic Acids Research* 2022. DOI `10.1093/nar/gkac261`.
+- Wang PY, Bartel DP. *Molecular Cell* 2024. DOI `10.1016/j.molcel.2024.06.026`.
+- Cedden D et al. *BMC Biology* 2025. DOI `10.1186/s12915-025-02219-6`.
+- ViennaRNA Package 2.7.2 RNAplfold and RNAfold documentation.
+
+# 33. Metrics deliberately not yet defined
 
 Do not create these until later analyses justify them:
 
@@ -3911,7 +4200,7 @@ construct-level secondary score
 
 ---
 
-# 33. Rule for introducing a new metric
+# 34. Rule for introducing a new metric
 
 Every future metric must document:
 
@@ -3934,7 +4223,7 @@ No important statistic should exist only inside a Python script.
 
 ---
 
-# 34. Main methodological references
+# 35. Main methodological references
 
 - Murcott B, Pawluk RJ, Protasio AV, Akinmusola RY, Lastik D, Hunt VL. 2022. *stepRNA: Identification of Dicer cleavage signatures and passenger strand lengths in small RNA sequences*. Frontiers in Bioinformatics 2:994871. DOI: 10.3389/fbinf.2022.994871.
 - Phipson B, Smyth GK. 2010. *Permutation P-values Should Never Be Zero: Calculating Exact P-values When Permutations Are Randomly Drawn*. Statistical Applications in Genetics and Molecular Biology 9:Article 39.
