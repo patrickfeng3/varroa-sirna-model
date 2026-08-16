@@ -19,6 +19,7 @@ include: "workflow/rules/stage07.smk"
 include: "workflow/rules/stage08.smk"
 include: "workflow/rules/stage09a.smk"
 include: "workflow/rules/stage09bc.smk"
+include: "workflow/rules/stage10a.smk"
 
 
 rule all:
@@ -136,3 +137,8 @@ rule all:
         "results/09_feature_layers/09C_layer3_target_engagement/layer3_weight_sensitivity_23nt.tsv",
         "results/09_feature_layers/09C_layer3_target_engagement/layer3_weight_sensitivity_24nt.tsv",
         "results/09_feature_layers/09C_layer3_target_engagement/layer3_correlations.tsv",
+        "results/10_candidate_integration/candidate_stage10a.tsv",
+        "results/10_candidate_integration/stage10a_layer_correlations.tsv",
+        "results/10_candidate_integration/stage10a_pareto_summary.tsv",
+        "results/10_candidate_integration/stage10_parameters.tsv",
+        "results/10_candidate_integration/stage10_qc.tsv",
