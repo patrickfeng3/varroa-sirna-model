@@ -23,5 +23,20 @@
     "joint_5p_distance": 2,
     "joint_3p_distance": -2,
     "steprna_version": "1.0.6"
+  },
+  "stage08": {
+    "viennarna_version": "2.7.2",
+    "temperature_c": 37.0,
+    "accessibility_parameter_sets": [
+      {"id": "W150_L100_main", "window_nt": 150, "max_bp_span_nt": 100},
+      {"id": "W100_L80_sensitivity", "window_nt": 100, "max_bp_span_nt": 80},
+      {"id": "W200_L150_sensitivity", "window_nt": 200, "max_bp_span_nt": 150}
+    ],
+    "seed_accessibility_guide_positions": [2, 8],
+    "terminal_thermo_model": "Zuber_2022",
+    "terminal_thermo_doi": "10.1093/nar/gkac261",
+    "asymmetry_terminal_lengths_nt": [4, 5],
+    "candidate_duplex_overhang_assumption": "none_perfect_complementary_duplex",
+    "self_fold_method": "ViennaRNA_RNAfold_MFE"
   }
 }

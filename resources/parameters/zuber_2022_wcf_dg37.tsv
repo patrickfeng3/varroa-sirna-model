@@ -1,0 +1,19 @@
+parameter_type	parameter_id	source_stack	delta_g37_kcal_mol	units	source_doi	description
+stack	AA	AA/UU	-0.94	kcal/mol	10.1093/nar/gkac261	Direct 5-to-3 top-strand Watson-Crick stack lookup
+stack	AC	AC/UG	-2.25	kcal/mol	10.1093/nar/gkac261	Direct 5-to-3 top-strand Watson-Crick stack lookup
+stack	AG	AG/UC	-2.01	kcal/mol	10.1093/nar/gkac261	Direct 5-to-3 top-strand Watson-Crick stack lookup
+stack	AU	AU/UA	-1.09	kcal/mol	10.1093/nar/gkac261	Direct 5-to-3 top-strand Watson-Crick stack lookup
+stack	CA	CA/GU	-2.07	kcal/mol	10.1093/nar/gkac261	Direct 5-to-3 top-strand Watson-Crick stack lookup
+stack	CC	CC/GG	-3.28	kcal/mol	10.1093/nar/gkac261	Direct 5-to-3 top-strand Watson-Crick stack lookup
+stack	CG	CG/GC	-2.33	kcal/mol	10.1093/nar/gkac261	Direct 5-to-3 top-strand Watson-Crick stack lookup
+stack	CU	AG/UC	-2.01	kcal/mol	10.1093/nar/gkac261	Reverse-complement-equivalent direct lookup
+stack	GA	GA/CU	-2.42	kcal/mol	10.1093/nar/gkac261	Direct 5-to-3 top-strand Watson-Crick stack lookup
+stack	GC	GC/CG	-3.46	kcal/mol	10.1093/nar/gkac261	Direct 5-to-3 top-strand Watson-Crick stack lookup
+stack	GG	CC/GG	-3.28	kcal/mol	10.1093/nar/gkac261	Reverse-complement-equivalent direct lookup
+stack	GU	AC/UG	-2.25	kcal/mol	10.1093/nar/gkac261	Reverse-complement-equivalent direct lookup
+stack	UA	UA/AU	-1.29	kcal/mol	10.1093/nar/gkac261	Direct 5-to-3 top-strand Watson-Crick stack lookup
+stack	UC	GA/CU	-2.42	kcal/mol	10.1093/nar/gkac261	Reverse-complement-equivalent direct lookup
+stack	UG	CA/GU	-2.07	kcal/mol	10.1093/nar/gkac261	Reverse-complement-equivalent direct lookup
+stack	UU	AA/UU	-0.94	kcal/mol	10.1093/nar/gkac261	Reverse-complement-equivalent direct lookup
+end_correction	AU_terminal_on_AU_penultimate	NA	0.22	kcal/mol	10.1093/nar/gkac261	Actual outer AU/UA terminal pair adjacent to AU/UA penultimate pair
+end_correction	AU_terminal_on_GC_penultimate	NA	0.44	kcal/mol	10.1093/nar/gkac261	Actual outer AU/UA terminal pair adjacent to GC/CG penultimate pair

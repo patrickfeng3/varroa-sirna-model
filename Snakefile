@@ -16,6 +16,7 @@ include: "workflow/rules/stage04.smk"
 include: "workflow/rules/stage05.smk"
 include: "workflow/rules/stage06.smk"
 include: "workflow/rules/stage07.smk"
+include: "workflow/rules/stage08.smk"
 
 
 rule all:
@@ -111,3 +112,6 @@ rule all:
         "results/07_empirical_sequence/feature_synthesis/feature_evidence_summary.tsv",
         "results/07_empirical_sequence/feature_synthesis/feature_digest.md",
         "results/07_empirical_sequence/feature_synthesis/feature_synthesis_qc.tsv",
+        "results/08_candidate_biophysics/candidate_biophysics.tsv",
+        "results/08_candidate_biophysics/stage08_parameters.tsv",
+        "results/08_candidate_biophysics/stage08_qc.tsv",
