@@ -1,6 +1,6 @@
 # Varroa vsiRNA Metric Dictionary
 
-**Version:** 0.19.1  
+**Version:** 0.20  
 **Scope:** Canonical metrics from Stage 01 through Stage 09 candidate evidence layers  
 **Rule:** Every important statistic must have a documented definition, analysis unit, direction, normalization, interpretation and limitation.
 
@@ -988,7 +988,7 @@ It is a target-relative empirical rank, not a biological probability.
 
 ---
 
-# 15. Stage 09A Layer-1 training metrics
+# 15. Stage 09A training metrics
 
 ## `stage09a_training_opportunity`
 
@@ -998,18 +998,39 @@ One valid depth-supported theoretical antisense opportunity:
 sample × virus × length × exact antisense sequence
 ```
 
+The theoretical antisense sequence is the reverse complement of the matched valid reference window.
+
+Canonical empirical Layer-1 lengths in v0.20:
+
+```text
+23 nt
+24 nt
+```
+
+Each length is modelled separately.
+
 ## `stage09a_represented`
 
 ```text
-1 = exact sequence observed
+1 = exact antisense sequence observed
 0 = valid opportunity exists but sequence unobserved
 ```
 
-Diagnostic response.
+Used for accounting/QC and connection to Stage 07 representation evidence.
+
+It is **not** the response of a new Stage 09A representation model.
 
 ## `stage09a_sequence_abundance`
 
-Summed canonical read abundance for one represented sample-virus-length-sequence species.
+Summed canonical read abundance for one represented:
+
+```text
+sample × virus × length × sequence
+```
+
+species.
+
+Primary observed accumulation outcome.
 
 ## `stage09a_log_abundance`
 
@@ -1017,11 +1038,11 @@ Summed canonical read abundance for one represented sample-virus-length-sequence
 ln(stage09a_sequence_abundance)
 ```
 
-Primary accumulation-model response among positives.
+for represented supported opportunities only.
 
 No pseudocount.
 
-Canonical v0.19.1 model family: fixed-effect elastic-net regression of this response. Count-native alternatives are sensitivity/future-model candidates, not canonical replacements in v0.19.1.
+Primary response for the length-specific weighted fixed-effect accumulation model.
 
 ---
 
@@ -1031,19 +1052,41 @@ Canonical v0.19.1 model family: fixed-effect elastic-net regression of this resp
 
 Physical first antisense-guide nucleotide.
 
-Categorical A/C/G/U.
+Categorical:
+
+```text
+A/C/G/U
+```
+
+Reference category:
+
+```text
+A
+```
 
 ## `guide_5p2_nt`
 
-Physical second guide nucleotide.
+Physical second antisense-guide nucleotide.
+
+Categorical `A/C/G/U`.
+
+Reference `A`.
 
 ## `guide_3p2_nt`
 
-Physical penultimate guide nucleotide.
+Physical penultimate antisense-guide nucleotide.
+
+Categorical `A/C/G/U`.
+
+Reference `A`.
 
 ## `guide_3p1_nt`
 
-Physical final guide nucleotide.
+Physical final antisense-guide nucleotide.
+
+Categorical `A/C/G/U`.
+
+Reference `A`.
 
 ## `guide_A3p3`
 
@@ -1054,99 +1097,70 @@ Physical final guide nucleotide.
 
 ## `guide_GC_3p5_10`
 
+GC fraction across exactly six guide positions:
+
+```text
+3p5–3p10
+```
+
+Equivalent:
+
 ```text
 number of G/C bases in guide[-10:-4] / 6
 ```
 
-Range `0..1`.
+Range:
+
+```text
+0 to 1
+```
 
 ## `guide_W17`
 
 ```text
-1 = g17 is A/U
+1 = guide position 17 is A/U
 0 = G/C
 ```
 
 ## `guide_R10`
 
 ```text
-1 = g10 is A/G
+1 = guide position 10 is A/G
 0 = C/U
 ```
 
-No Stage 02 enrichment ratio is added separately.
+These eight variables are the only canonical Stage 09A sequence predictors.
 
 ---
 
-# 17. Stage 09A candidate metrics
-
-## `layer1_accumulation_linear_predictor`
-
-Sequence-only fitted predictor:
-
-```text
-β_hatᵀX_candidate
-```
-
-Higher = greater predicted Varroa viral-small-RNA accumulation propensity.
-
-Not a read-count prediction, AGO-loading probability, or efficacy probability.
-
-## `layer1_accumulation_percentile`
-
-Within-target, within-length favourable percentile of `layer1_accumulation_linear_predictor`.
-
-Primary normalized Layer-1 candidate metric.
-
-## `layer1_representation_probability_diagnostic`
-
-Predicted probability that a valid sequence opportunity is represented, from the secondary logistic model.
-
-Diagnostic only.
-
-## `layer1_representation_percentile_diagnostic`
-
-Within-target, within-length favourable percentile of representation probability.
-
-Diagnostic only.
-
-## `layer1_hurdle_score_diagnostic`
-
-```text
-representation probability
-×
-conditional accumulation prediction
-```
-
-Benchmark only.
-
-Not canonical primary Layer 1.
-
----
-
-# 18. Stage 09A model-definition metrics
+# 17. Stage 09A model-definition metrics
 
 ## `layer1_fit_weight`
 
-Canonical observation weight for the positive accumulation model.
-
-For observation `i` in biological sample `s` and sample-virus-length group `g`:
+For one represented training observation in a single length-specific model:
 
 ```text
-w_raw_i = 1 / (G_s × N_g)
+w_raw_i
+=
+1 / (G_s × N_g)
 ```
 
 where:
 
 ```text
-G_s = number of eligible sample-virus-length groups
-      contributed by sample s in the current training set
+G_s
+=
+number of eligible sample-virus groups
+contributed by biological sample s
+for the current length and training set
 
-N_g = number of represented sequence species
-      in group g
+N_g
+=
+number of represented training sequence species
+in sample-virus group g
 ```
 
-Rescale within each training set:
+Rescale:
 
 ```text
 w_i
@@ -1155,7 +1169,7 @@ w_raw_i
 ×
 n_training
 /
-Σ w_raw
+Σ_i w_raw_i
 ```
 
 so mean training weight is 1.
@@ -1163,240 +1177,261 @@ so mean training weight is 1.
 Interpretation:
 
 ```text
-equal total sample weight
-+
+equal total weight per biological sample
 equal group weight within sample
-+
 equal species weight within group
 ```
 
-Read abundance is not also used as a fit weight.
+Read abundance is the response and is not also used as a fitting weight.
 
-## `layer1_feature_z`
+## `layer1_group_fixed_effect`
 
-Training-standardized encoded sequence feature:
+Unpenalized nuisance intercept for one:
 
 ```text
-z_j
+sample × virus
+```
+
+group within one fixed candidate length.
+
+Purpose:
+
+```text
+control baseline abundance differences among
+viral/library groups
+```
+
+It is not transferred to target candidates.
+
+## `layer1_model_family`
+
+Canonical v0.20 value:
+
+```text
+weighted_fixed_effect_linear_regression
+```
+
+Response:
+
+```text
+ln(sequence abundance)
+```
+
+Penalty:
+
+```text
+none
+```
+
+Hyperparameter tuning:
+
+```text
+none
+```
+
+Model-structure search:
+
+```text
+none
+```
+
+Length handling:
+
+```text
+separate model for 23 nt
+separate model for 24 nt
+```
+
+---
+
+# 18. Stage 09A candidate metrics
+
+## `layer1_accumulation_linear_predictor`
+
+For a candidate of length `L`:
+
+```text
+β_hat_Lᵀ X_candidate
+```
+
+where `β_hat_L` is fitted from the final model for that same candidate length.
+
+No viral nuisance group intercept is added.
+
+Direction:
+
+```text
+higher
 =
-(x_j - mean_training_j)
-/
-sd_training_j
+greater predicted Varroa viral-small-RNA
+accumulation propensity within that length
 ```
 
-Scaling parameters are learned from training data only.
-
-Held-out observations never affect scaling.
-
-Zero-SD training columns are omitted for that fold and recorded in QC.
-
-## `layer1_fixed_effect_centered_response`
-
-For accumulation training group `g`:
+Not equivalent to:
 
 ```text
-y*_i
-=
-ln(count_i)
--
-weighted_mean_g(ln(count))
+predicted read count
+AGO-loading probability
+RNAi efficacy probability
 ```
 
-Used to absorb unpenalized sample-virus-length nuisance intercepts.
+Raw 23-nt and 24-nt values are not assumed directly comparable.
 
-## `layer1_fixed_effect_centered_feature`
+## `layer1_accumulation_percentile`
 
-For standardized sequence feature `z_j`:
+Within:
 
 ```text
-z*_{ij}
-=
-z_{ij}
--
-weighted_mean_g(z_j)
+target × candidate_length
 ```
 
-The elastic-net fit is performed on centered response/features with no global intercept.
+favourable percentile of `layer1_accumulation_linear_predictor`.
 
-## `layer1_elasticnet_alpha`
+Primary normalized Layer-1 candidate metric.
 
-Overall elastic-net penalty strength.
-
-Canonical search grid:
-
-```text
-1e-5
-3e-5
-1e-4
-3e-4
-1e-3
-3e-3
-1e-2
-3e-2
-1e-1
-3e-1
-1
-```
-
-## `layer1_elasticnet_l1_ratio`
-
-L1/L2 mixing parameter.
-
-Canonical search grid:
-
-```text
-0.05
-0.25
-0.50
-0.75
-0.95
-1.00
-```
-
-Interpretation:
-
-```text
-higher -> more L1-like sparsity
-lower  -> more L2-like shrinkage
-```
-
-## `layer1_model_structure`
-
-One of:
-
-```text
-A_shared
-B_shared_plus_length_interactions
-C_separate_23_24
-```
-
-Regardless of value, 23- and 24-nt analyses remain separately evaluated and normalized.
-
-## `layer1_selection_score_rho`
-
-Equal-length model-selection statistic:
-
-```text
-(
- median_23nt_within_group_rho
- +
- median_24nt_within_group_rho
-)
-/
-2
-```
-
-Used only inside training CV.
-
-## `layer1_selection_score_top10`
-
-Secondary equal-length tie-break:
-
-```text
-(
- median_23nt_top10_lift
- +
- median_24nt_top10_lift
-)
-/
-2
-```
-
-## `layer1_hyperparameter_boundary_warning`
-
-Boolean.
-
-```text
-true
-```
-
-when selected final `alpha` lies on minimum or maximum canonical search-grid boundary.
-
-Triggers review of search-grid adequacy before freezing coefficients.
+23 nt and 24 nt are always normalized separately.
 
 ---
 
 # 19. Stage 09A validation metrics
 
-## `layer1_cv_spearman_rho`
+## `layer1_lovo_group_spearman_rho`
 
-Within held-out sample-virus-length group:
+Within one held-out:
+
+```text
+sample × virus × length
+```
+
+group:
 
 ```text
 Spearman(
-    predicted Layer-1 score,
+    sequence-only prediction,
     observed abundance
 )
 ```
 
-across all valid opportunities, assigning abundance zero to unrepresented opportunities.
+across all valid theoretical opportunities.
 
-Range `[-1,+1]`.
+Unrepresented opportunities have observed abundance `0`.
 
-Primary validation metric.
-
-23/24 summaries separate.
-
-## `layer1_cv_top10_abundance_share`
-
-Fraction of total observed abundance contained in highest-scoring 10% of valid opportunities.
-
-## `layer1_cv_top10_abundance_lift`
+Range:
 
 ```text
-top10_abundance_share
+-1 to +1
+```
+
+Higher positive values indicate better ranking agreement.
+
+## `layer1_lovo_group_top10_abundance_share`
+
+For one held-out group:
+
+```text
+abundance in highest-scoring ceil(0.10 × n) opportunities
 /
-selected_opportunity_fraction
+total observed abundance
+```
+
+If total observed abundance is zero:
+
+```text
+NA
+```
+
+## `layer1_lovo_group_top10_abundance_lift`
+
+```text
+layer1_lovo_group_top10_abundance_share
+/
+(ceil(0.10 × n) / n)
 ```
 
 Interpretation:
 
 ```text
-1 = random-level abundance capture
->1 = enrichment
-<1 = depletion
+1   = random-level abundance capture
+>1  = enrichment
+<1  = depletion
 ```
 
-## `layer1_cv_conditional_positive_rho`
+## `layer1_virus_holdout_median_rho`
 
-Spearman correlation among represented opportunities only.
-
-Secondary metric.
-
-## `layer1_representation_roc_auc`
-
-ROC-AUC of representation diagnostic.
-
-Chance reference `0.5`.
-
-## `layer1_representation_average_precision`
-
-Average precision for represented vs unrepresented opportunities.
-
-## `layer1_representation_ap_lift`
+For one held-out virus/family and one length:
 
 ```text
-average_precision
-/
-representation_prevalence
+median of valid sample-group Spearman rho values
 ```
 
-`1` = prevalence baseline.
+## `layer1_virus_holdout_median_top10_lift`
 
-
-## `layer1_representation_penalty_factor`
-
-Coefficient-specific penalty factor for the representation diagnostic model.
+For one held-out virus/family and one length:
 
 ```text
-0 = nuisance sample-virus-length intercept
-1 = sequence-effect coefficient
+median of valid sample-group top10 abundance lifts
 ```
 
-This prevents nuisance group baselines from being regularized as if they were biological sequence predictors.
+## `layer1_crossvirus_median_rho`
 
+For one length:
 
----
+```text
+median of the virus-holdout median rho values
+```
+
+Reported separately for 23 nt and 24 nt.
+
+## `layer1_crossvirus_positive_rho_count`
+
+Number of held-out virus/family analyses with:
+
+```text
+virus_holdout_median_rho > 0
+```
+
+Reported as:
+
+```text
+count / number_of_valid_holdouts
+```
+
+## `layer1_crossvirus_median_top10_lift`
+
+Median of virus-holdout median top10 lifts for one length.
+
+## `layer1_crossvirus_top10_lift_gt1_count`
+
+Number of valid virus/family holdouts with:
+
+```text
+virus_holdout_median_top10_lift > 1
+```
+
+## `layer1_coefficient_holdout_median`
+
+For one fitted sequence coefficient and one length:
+
+```text
+median coefficient across the five
+leave-one-virus/family-out fits
+```
+
+## `layer1_coefficient_holdout_min`
+
+Minimum coefficient across the holdout fits.
+
+## `layer1_coefficient_holdout_max`
+
+Maximum coefficient across the holdout fits.
+
+## `layer1_coefficient_same_sign_count`
+
+Number of valid held-out-virus fits whose coefficient has the same sign as the final full-data coefficient.
+
+Diagnostic only.
+
+No coefficient-stability threshold is used as a candidate filter.
 
 # 20. Stage 09B Layer-2 metrics
 
@@ -1571,7 +1606,7 @@ unsupported
 
 For Varroa, 23/24 should currently be recommended but not enforced as the only allowed inputs.
 
-A Stage 09A model trained only on 23/24 data must not be labelled validated for another length until that length has been trained/tested.
+The current Stage 09A empirical models are separately trained and validated for 23 nt and 24 nt. They must not be labelled validated for another length until that requested length has its own suitable training/validation evidence.
 
 If multiple lengths are requested, each length remains a separate normalization/analysis population unless a future specification explicitly validates cross-length pooling.
 
@@ -1655,6 +1690,5 @@ No important statistic should exist only inside code.
 - Wang PY, Bartel DP. 2024. *The guide-RNA sequence dictates the slicing kinetics and conformational dynamics of the Argonaute silencing complex.* Molecular Cell. DOI `10.1016/j.molcel.2024.06.026`.
 - Ruijtenberg S et al. 2020. *mRNA structural dynamics shape Argonaute-target interactions.* NSMB. DOI `10.1038/s41594-020-0461-1`.
 - Cedden D et al. 2025. *Optimizing dsRNA sequences for RNAi in pest control and research with the dsRIP web platform.* BMC Biology 23:114. DOI `10.1186/s12915-025-02219-6`.
-- Zou H, Hastie T. 2005. *Regularization and variable selection via the elastic net.* JRSS B 67:301–320. DOI `10.1111/j.1467-9868.2005.00503.x`.
 
 Evidence imported from non-Varroa systems remains mechanistic/comparative support only unless separately validated in Varroa.

@@ -1,7 +1,7 @@
 # Canonical Varroa vsiRNA Pipeline Specification
 
-**Specification version:** 0.19.1  
-**Status:** Stages 00–08 implemented/validated as previously frozen; Stage 09A/09B/09C implementation-ready specification  
+**Specification version:** 0.20  
+**Status:** Stages 00–08 implemented/validated as previously frozen; Stage 09A/09B/09C specified for a simplified, implementation-ready Stage 09 build  
 **Scope:** Canonical viral small-RNA analysis, generic transcript candidate enumeration, empirical Varroa guide-sequence association, candidate biophysics, and Stage 09 three-layer candidate evidence synthesis  
 **Host transitivity:** Excluded from current canonical build  
 **Final candidate / construct ranking:** Deferred to Stage 10
@@ -1108,103 +1108,189 @@ No automatic 23- or 24-nt bonus is applied.
 
 ## 09A.1 Biological question
 
-> Which antisense sequence characteristics predict greater accumulation in the validated Varroa viral small-RNA population?
+Stage 09A asks:
 
-Interpretation:
+> Which antisense sequence characteristics are associated with greater accumulation in the validated Varroa viral small-RNA population, and do those associations transfer in the same direction to an unseen virus?
+
+The primary interpretation is:
 
 ```text
 Varroa small-RNA processing / recovery / accumulation propensity
 ```
 
-Do not call it AGO loading or efficacy.
-
-## 09A.2 Architectural decision
-
-Development-stage comparisons evaluated:
+Stage 09A must not be described as:
 
 ```text
-representation only
-accumulation only
-hurdle = representation × conditional accumulation
+AGO2 loading probability
+RISC incorporation probability
+target cleavage probability
+RNAi efficacy
 ```
 
-Accumulation propensity gave the strongest overall held-out abundance recovery.
+because the training libraries contain total viral small RNAs rather than purified AGO-bound guides or candidate-level knockdown measurements.
 
-Therefore:
+---
+
+## 09A.2 Simplified canonical architecture
+
+Stage 09A deliberately uses a **simple, transparent multivariable accumulation model**.
+
+Development analyses showed that:
 
 ```text
-PRIMARY Layer 1      = accumulation propensity
-SECONDARY DIAGNOSTIC = representation probability
-BENCHMARK ONLY        = hurdle combination
+representation
+accumulation
+and a representation × accumulation hurdle score
 ```
 
-Representation must not be added as an independent equal-weight second Layer-1 contribution.
+all contain sequence-associated signal, but accumulation propensity was the most useful primary quantity for recovering high-abundance products.
 
-## 09A.3 Frozen training population
-
-Inclusion:
+Therefore v0.20 defines:
 
 ```text
-primary_eligible sample-virus
+PRIMARY Layer 1
+= abundance / accumulation propensity
+
+representation
+= supporting Stage 07 evidence and Stage 09A accounting/QC only
+
+hurdle combination
+= non-canonical development analysis only
+```
+
+Stage 09A does **not** fit a second representation model and does **not** fit a hurdle model.
+
+This avoids unnecessary model duplication and avoids double-counting overlapping sequence information.
+
+---
+
+## 09A.3 Mandatory separate 23-nt and 24-nt models
+
+Canonical Stage 09A fits:
+
+```text
+one 23-nt accumulation model
+one 24-nt accumulation model
+```
+
+The two lengths are analysed independently.
+
+They have:
+
+- separate training matrices;
+- separate fitted coefficients;
+- separate leave-one-virus-out validation;
+- separate validation summaries;
+- separate candidate score distributions;
+- separate candidate percentile normalization;
+- separate QC.
+
+No shared-coefficient model-selection exercise is performed in v0.20.
+
+This choice is intentionally simple and is consistent with the project requirement that 23-nt and 24-nt products remain separate biological analyses.
+
+No automatic bonus or penalty is applied to either length.
+
+---
+
+## 09A.4 Frozen training population
+
+Reconstruct Stage 09A only from validated frozen viral inputs.
+
+Required inclusion:
+
+```text
+primary_eligible sample × virus unit
 mapping_mode = exact
 virus_assignment = assigned
 strand = antisense
-length ∈ {23,24}
-fully A/C/G/T
-valid depth-supported background opportunity
+length = 23 nt or 24 nt
+sequence fully A/C/G/T
+sequence corresponds to a valid depth-supported background opportunity
 ```
 
-Current frozen fixtures:
+Observed antisense sequences are already in physical sequenced 5′→3′ orientation and must **not** be reverse-complemented again.
+
+The matched theoretical antisense opportunity is the reverse complement of the corresponding valid reference window.
+
+Current frozen-data regression fixtures:
 
 ```text
-20 primary samples
-54 sample-virus units
-108 sample-virus-length groups
+primary biological samples              20
+eligible sample-virus units             54
 
-23-nt opportunities = 411,079
-24-nt opportunities = 408,148
-total opportunities = 819,227
+23-nt supported opportunities       411,079
+24-nt supported opportunities       408,148
+total supported opportunities       819,227
 
-23-nt represented = 121,592
-24-nt represented = 175,564
-total represented = 297,156
+23-nt represented opportunities     121,592
+24-nt represented opportunities     175,564
+total represented opportunities     297,156
 
-supported abundance = 3,445,943
+supported observed abundance      3,445,943
 ```
 
-Outside-background exact antisense observations are excluded from model fitting but retained in QC.
+Current represented fractions:
 
-## 09A.4 Training unit
+```text
+23 nt = 29.5787%
+24 nt = 43.0148%
+```
+
+Observed exact antisense sequence/group entries outside the validated background opportunity are excluded from model fitting but retained in QC.
+
+Current audit expectation:
+
+```text
+outside-background distinct sequence/group entries = 3,616
+outside-background abundance                        = 3,973
+outside-background abundance fraction               ≈ 0.1152%
+```
+
+These values are regression fixtures for the frozen dataset and must be reconstructed rather than copied from historical Stage 09 outputs.
+
+---
+
+## 09A.5 Training unit and positive accumulation outcome
+
+The theoretical opportunity unit is:
 
 ```text
 sample × virus × length × antisense sequence
 ```
 
-## 09A.5 Primary outcome
-
-Among represented supported sequences:
+For the accumulation model, retain only represented supported opportunities:
 
 ```text
-count_i = summed canonical abundance
+abundance > 0
+```
+
+For represented sequence `i`:
+
+```text
+count_i
+=
+summed canonical abundance
+for that exact sample × virus × length × sequence
+```
+
+Primary response:
+
+```text
 y_i = ln(count_i)
 ```
 
-No pseudocount.
+No pseudocount is required.
 
-The objective is ranking relative accumulation propensity.
+The log transform reduces domination by the strongly right-skewed positive abundance distribution.
 
-## 09A.6 Representation diagnostic outcome
+The modelling objective is **relative accumulation ranking**, not literal read-count prediction.
 
-Across all valid opportunities:
+---
 
-```text
-Y_rep = 1 if exact sequence observed
-        0 otherwise
-```
+## 09A.6 Sequence predictors
 
-## 09A.7 Predictors
-
-Use exactly:
+Each length-specific model uses the same eight pre-specified descriptors:
 
 ```text
 5p1
@@ -1219,31 +1305,81 @@ R10
 
 Definitions:
 
+### `5p1`
+
+Physical first nucleotide of the antisense guide.
+
+### `5p2`
+
+Physical second nucleotide of the antisense guide.
+
+### `3p2`
+
+Physical penultimate nucleotide of the antisense guide.
+
+### `3p1`
+
+Physical final nucleotide of the antisense guide.
+
+Terminal nucleotide variables are categorical:
+
 ```text
-A3p3 = A at third nucleotide from physical guide 3′ end
-
-GC_3p5_10
-= GC fraction across exactly six guide bases 3p5–3p10
-
-W17 = A/U at g17
-
-R10 = A/G at g10
+A / C / G / U
 ```
 
-Do not add Stage 02 enrichment ratios as separate predictors.
-
-Do not include Stage 03/04 geometry, Stage 05 transitivity, W7, or Stage 08 variables in Layer 1.
-
-## 09A.8 Canonical accumulation model
-
-The canonical Stage 09A accumulation model is a **fixed-effect elastic-net regression of positive log abundance**.
-
-For represented sequence `i` in training group `g`:
+with fixed regression reference category:
 
 ```text
-y_i = ln(count_i)
+A
+```
 
-y_i
+### `A3p3`
+
+```text
+1 = third nucleotide from physical guide 3′ end is A
+0 = otherwise
+```
+
+### `GC_3p5_10`
+
+Continuous GC fraction across exactly six guide positions:
+
+```text
+3p5, 3p6, 3p7, 3p8, 3p9, 3p10
+```
+
+Equivalent sequence slice:
+
+```text
+guide[-10:-4]
+```
+
+### `W17`
+
+```text
+1 = guide position 17 is A or U
+0 = guide position 17 is G or C
+```
+
+### `R10`
+
+```text
+1 = guide position 10 is A or G
+0 = guide position 10 is C or U
+```
+
+Stage 02 terminal enrichment ratios are not inserted as separate predictors because the terminal categories already carry that sequence information.
+
+Stage 03/04 geometry, Stage 05 transitivity, W7, Stage 08 accessibility, Stage 08 asymmetry and Stage 08 self-folding are excluded from Layer 1.
+
+---
+
+## 09A.7 Canonical model
+
+For each length independently, fit a weighted fixed-effect linear model:
+
+```text
+ln(count_i)
 =
 a_g
 +
@@ -1255,167 +1391,72 @@ a_g
 where:
 
 ```text
+g
+=
+sample × virus group
+for the current candidate length
+
 a_g
-= unpenalized nuisance intercept for
-  sample × virus × candidate_length
+=
+unpenalized nuisance group intercept
 
 X_i
-= pre-specified sequence-feature vector
+=
+the eight pre-specified sequence descriptors
+after fixed categorical encoding
 
 β
-= penalized sequence-effect coefficients
+=
+sequence-effect coefficients
 ```
 
-The nuisance intercepts account for baseline differences between viral/library/length groups.
+No elastic-net penalty is used.
 
-They are not candidate biology and are never transferred to new target candidates.
+No hyperparameter search is used.
 
-### Exact nuisance-intercept treatment
+No model-structure search is used.
 
-For the linear accumulation model, nuisance intercepts are removed by the fixed-effect within-group transformation inside each training fold.
+The canonical implementation may use weighted least squares with explicit group fixed effects or an exactly equivalent weighted within-group transformation.
 
-For every training group `g`:
+The fitted nuisance group effects account for baseline differences among viral/library groups.
+
+They are not candidate biology and are never transferred to target candidates.
+
+The candidate-facing sequence score is:
 
 ```text
-y*_i = y_i - weighted_mean_g(y)
-
-X*_ij = X_ij - weighted_mean_g(X_j)
+β_hatᵀX_candidate
 ```
 
-The elastic-net model is then fitted to:
+without any viral nuisance intercept.
+
+---
+
+## 09A.8 Sample-aware fitting weights
+
+For a given length, let:
 
 ```text
-y* ~ X*
+G_s
+=
+number of eligible sample-virus groups
+contributed by biological sample s
+
+N_g
+=
+number of represented training sequence species
+in sample-virus group g
 ```
 
-with:
-
-```text
-fit_intercept = false
-```
-
-This is the canonical implementation of unpenalized group fixed effects.
-
-Held-out groups are never used to calculate these training-group means.
-
-For candidate application, the frozen sequence model is evaluated from the original candidate sequence features using the stored training-fold/final-model encoding and scaling parameters; no viral group intercept is added.
-
-## 09A.9 Predictor encoding and scaling
-
-Terminal nucleotide predictors are one-hot encoded with fixed reference category:
-
-```text
-A
-```
-
-Binary features:
-
-```text
-A3p3
-W17
-R10
-```
-
-use `0/1` coding.
-
-`GC_3p5_10` remains continuous.
-
-For penalized fitting, every encoded sequence-feature column is standardized using **training data only**:
-
-```text
-z_j = (x_j - mean_training_j) / sd_training_j
-```
-
-Rules:
-
-- scaling parameters are learned inside each inner/outer training set only;
-- held-out data never contribute to means or SDs;
-- columns with zero training SD are removed for that fold and recorded in QC;
-- final full-data scaling parameters are frozen and stored;
-- candidate application uses the final frozen scaling parameters.
-
-After standardization, the fixed-effect within-group transformation is applied.
-
-## 09A.10 Exact elastic-net objective
-
-For training observations with sample-aware weights `w_i`, fit sequence coefficients by minimizing:
-
-```text
-(1 / (2 Σ_i w_i))
-Σ_i w_i (y*_i - X*_i β)^2
-
-+
-alpha [
-    l1_ratio × ||β||_1
-    +
-    0.5 × (1-l1_ratio) × ||β||_2^2
-]
-```
-
-Canonical hyperparameter grid:
-
-```text
-alpha ∈ {
-    1e-5,
-    3e-5,
-    1e-4,
-    3e-4,
-    1e-3,
-    3e-3,
-    1e-2,
-    3e-2,
-    1e-1,
-    3e-1,
-    1
-}
-
-l1_ratio ∈ {
-    0.05,
-    0.25,
-    0.50,
-    0.75,
-    0.95,
-    1.00
-}
-```
-
-If the selected `alpha` is on the minimum or maximum grid boundary in the final tuning procedure, record:
-
-```text
-hyperparameter_boundary_warning = true
-```
-
-and inspect whether a wider grid is required before freezing coefficients.
-
-The canonical model is the log-abundance elastic-net model.
-
-A count-native overdispersed positive-count model may be explored later as a **non-blocking sensitivity analysis**, but it does not replace the canonical model in v0.19.1 unless the specification is deliberately revised before inspecting candidate rankings.
-
-## 09A.11 Exact sample-aware fitting weights
-
-Let:
-
-```text
-s(i) = biological sample containing observation i
-g(i) = sample × virus × length group containing observation i
-
-G_s = number of eligible sample-virus-length groups
-      contributed by biological sample s
-      in the current training set
-
-N_g = number of represented training sequence species
-      in group g
-```
-
-Define the unscaled observation weight:
+For represented training observation `i` in sample `s` and group `g`:
 
 ```text
 w_i_raw
 =
-1 / (G_s(i) × N_g(i))
+1 / (G_s × N_g)
 ```
 
-Then rescale within the current training set:
+Rescale inside the current training set:
 
 ```text
 w_i
@@ -1427,193 +1468,98 @@ n_training
 Σ_i w_i_raw
 ```
 
-so that mean training weight is 1.
+so mean training weight is 1.
 
-Consequences:
+Therefore:
 
 ```text
 each biological sample contributes equal total weight
 
 within a sample:
-each eligible sample-virus-length group contributes
-equal total weight
+each eligible virus group contributes equal total weight
 
 within a group:
-each represented sequence species contributes
-equal fitting weight
+each represented sequence species contributes equal fitting weight
 ```
 
-Observed read abundance is the response and is **not** also used as a model-fitting weight.
+Observed read abundance is the response and is **not** also used as a fitting weight.
 
-Sensitivity analysis:
+This weighting is recalculated within every leave-one-virus-out training set using training data only.
 
-```text
-equal_group_weighting
-```
+---
 
-where every sample-virus-length group contributes equal total weight regardless of how many eligible groups occur in a sample.
+## 09A.9 Primary validation: leave one virus/family out
 
-## 09A.12 Candidate 23/24 model structures
-
-Three pre-specified structures are compared.
-
-### Structure A — shared effects
-
-```text
-one β coefficient set shared by 23 nt and 24 nt
-```
-
-Length-specific baseline differences remain absorbed by the nuisance sample-virus-length fixed effects.
-
-### Structure B — shared effects plus length interactions
-
-```text
-shared main effects
-+
-feature × candidate_length interactions
-```
-
-Candidate length is encoded only as the 23/24 interaction indicator required for this comparison.
-
-### Structure C — separate models
-
-```text
-independent 23-nt model
-independent 24-nt model
-```
-
-No structure is declared correct in advance.
-
-Regardless of the selected structure:
-
-```text
-23-nt validation remains separate
-24-nt validation remains separate
-
-23-nt candidate normalization remains separate
-24-nt candidate normalization remains separate
-```
-
-Shared coefficients never imply pooled biological analysis.
-
-## 09A.13 Nested cross-validation
-
-### Outer primary validation
-
-Use:
+Stage 09A uses one simple external-style internal validation:
 
 ```text
 leave-one-biological-virus/family-out
 ```
 
-All units belonging to the held-out virus/family are excluded from:
+For each of the five current biological virus/family groups:
 
-- sequence-feature scaling;
-- fixed-effect centering;
-- hyperparameter tuning;
-- model-structure choice;
-- model fitting.
+1. hold out all samples belonging to that virus/family;
+2. fit the 23-nt model on the remaining viruses/families;
+3. fit the 24-nt model on the remaining viruses/families;
+4. calculate sequence-only predictions for the held-out opportunities;
+5. evaluate held-out performance separately for 23 nt and 24 nt.
 
-Where multiple analysis units are recognized as closely related strains of one biological virus, they must be held out together.
-
-### Inner tuning
-
-Within each outer training set, use leave-one-virus/family-out CV among the remaining training viruses/families.
-
-For every candidate model structure and hyperparameter configuration:
-
-1. fit using only the inner-training viruses/families;
-2. predict the inner-held-out virus/family;
-3. calculate performance separately for 23 nt and 24 nt.
-
-### Secondary validation
-
-After primary virus/family CV, also report:
+There is:
 
 ```text
-leave-one-biological-sample-out
+no nested CV
+no leave-one-sample-out model search
+no hyperparameter tuning
+no repeated model-family selection
 ```
 
-using the already specified model-selection procedure.
-
-This is a robustness analysis and does not replace the primary virus/family transfer test.
-
-## 09A.14 Exact model-selection objective
-
-For every inner-held-out fold, calculate performance separately for 23 nt and 24 nt.
-
-For each candidate configuration calculate:
+Current canonical validation therefore requires approximately:
 
 ```text
-M23 = median within-group Spearman rho for 23 nt
-M24 = median within-group Spearman rho for 24 nt
+5 held-out-virus fits for 23 nt
+5 held-out-virus fits for 24 nt
+
++ 1 final full-data fit for 23 nt
++ 1 final full-data fit for 24 nt
 ```
 
-Primary selection score:
+for a total of approximately:
 
 ```text
-selection_score_rho
-=
-(M23 + M24) / 2
+12 primary accumulation fits
 ```
 
-Thus 23 nt and 24 nt contribute equal weight to model selection even if their opportunity counts differ.
+This simplicity is intentional.
 
-Secondary tie-break:
+---
+
+## 09A.10 Held-out evaluation
+
+For one held-out virus/family and one length, evaluate within each available:
 
 ```text
-L23 = median top10 abundance lift for 23 nt
-L24 = median top10 abundance lift for 24 nt
-
-selection_score_top10
-=
-(L23 + L24) / 2
+sample × held-out-virus × length
 ```
 
-Selection order:
+group across **all valid theoretical opportunities**.
 
-1. maximize `selection_score_rho`;
-2. if tied to numerical tolerance `1e-6`, maximize `selection_score_top10`;
-3. if still tied, choose the larger `alpha` (stronger regularization);
-4. if still tied, choose the larger `l1_ratio`;
-5. if still tied, prefer the simpler structure in order:
-
-```text
-A shared
-B shared + interactions
-C separate
-```
-
-A candidate structure/configuration must not be selected solely because one length performs strongly while the other is substantially degraded without this being visible in the separate 23/24 outputs.
-
-All separate 23/24 metrics are retained regardless of the combined selection statistic.
-
-## 09A.15 Held-out prediction metrics
-
-Evaluate predictions within each held-out:
-
-```text
-sample × virus × candidate_length
-```
-
-group across **all valid theoretical opportunities**, assigning:
+Unrepresented opportunities receive:
 
 ```text
 observed abundance = 0
 ```
 
-to unrepresented opportunities.
-
-Required:
+Required per-group metrics:
 
 ```text
-Spearman rho(predicted score, observed abundance)
+Spearman rho(
+    predicted sequence score,
+    observed abundance
+)
 
 top10_abundance_share
 
 top10_abundance_lift
-
-conditional_positive_spearman_rho
 ```
 
 where:
@@ -1621,7 +1567,8 @@ where:
 ```text
 top10_abundance_share
 =
-abundance in highest-scoring ceil(0.10 × n) opportunities
+abundance contained in the highest-scoring
+ceil(0.10 × n) opportunities
 /
 total observed abundance
 ```
@@ -1636,121 +1583,181 @@ top10_abundance_share
 (ceil(0.10 × n) / n)
 ```
 
-If total observed abundance is zero, abundance-share/lift are `NA`.
-
-All validation summaries are reported independently for 23 nt and 24 nt.
-
-## 09A.16 Representation diagnostic model
-
-The representation model remains secondary.
-
-Response:
+Interpretation:
 
 ```text
-Y_rep = 1 if exact supported opportunity is represented
-        0 otherwise
-```
-
-Use the same eight sequence predictors.
-
-The model is a regularized logistic regression with:
-
-```text
-sample × virus × length nuisance intercepts unpenalized
-sequence-effect coefficients penalized
-```
-
-The implementation must use a solver that supports coefficient-specific penalty factors, with:
-
-```text
-penalty_factor(group nuisance intercepts) = 0
-penalty_factor(sequence effects)          = 1
-```
-
-or an exactly equivalent implementation.
-
-Representation tuning must occur inside the same leakage-free grouped CV framework.
-
-Required diagnostics, separately for 23 nt and 24 nt:
-
-```text
-ROC-AUC
-average precision
-AP lift relative to prevalence
-top-decile representation enrichment
-```
-
-The representation prediction is not independently added to the primary Layer-1 accumulation score.
-
-## 09A.17 Hurdle benchmark
-
-For diagnostic comparison only:
-
-```text
-hurdle_score
+rho > 0
 =
-P(represented)
-×
-conditional accumulation prediction
+higher predicted sequence propensity tends to
+correspond to greater observed abundance
+
+top10 lift > 1
+=
+predicted top-scoring opportunities capture more
+abundance than random selection of the same size
 ```
 
-Evaluate under the same held-out scheme.
+If a held-out group has no observed abundance, its abundance-share/lift are `NA`.
 
-The hurdle result is retained as a benchmark and does not become canonical without a future pre-specified revision.
+---
 
-## 09A.18 Final frozen Layer-1 fit
+## 09A.11 Virus-level and cross-virus summaries
 
-After completing nested outer evaluation:
+Within each held-out virus/family and length:
 
-1. choose the model structure using the pre-specified CV rule;
-2. using all frozen viral training data, tune `alpha` and `l1_ratio` with leave-one-virus/family-out CV;
-3. fit the final model on all frozen viral training data;
-4. freeze sequence encoding, scaling parameters, structure, hyperparameters and coefficients;
-5. store exact software/package versions.
+```text
+virus_holdout_median_rho
+=
+median of valid sample-group Spearman rho values
 
-Candidate-facing raw score:
+virus_holdout_median_top10_lift
+=
+median of valid sample-group top10 lifts
+```
+
+Across the five held-out virus/family analyses, report separately for 23 nt and 24 nt:
+
+```text
+median virus-holdout rho
+
+range / individual virus-holdout rho values
+
+number of virus holdouts with rho > 0
+
+median virus-holdout top10 lift
+
+range / individual virus-holdout top10 lift values
+
+number of virus holdouts with top10 lift > 1
+```
+
+These are descriptive generalization diagnostics.
+
+Stage 09A does **not** impose an arbitrary hard PASS threshold such as requiring a fixed number of positive folds.
+
+The results must instead be reported transparently and interpreted according to their magnitude and consistency.
+
+---
+
+## 09A.12 Coefficient stability diagnostic
+
+The five leave-one-virus-out fits already produced for validation are reused to assess coefficient stability.
+
+For each length and fitted sequence coefficient report:
+
+```text
+final_full_data_coefficient
+
+median_holdout_fit_coefficient
+
+minimum_holdout_fit_coefficient
+
+maximum_holdout_fit_coefficient
+
+n_holdout_fits_same_sign_as_final
+```
+
+This introduces no additional model fits.
+
+It is a diagnostic of whether an estimated sequence association is strongly dependent on one virus/family.
+
+It is not an additional scoring layer.
+
+---
+
+## 09A.13 Final full-data models
+
+After leave-one-virus-out validation, fit:
+
+```text
+one final 23-nt model
+one final 24-nt model
+```
+
+using all frozen eligible viral training data for the corresponding length.
+
+No validation result is used to tune model complexity because there is no hyperparameter/model-structure search.
+
+The final candidate-facing raw scores are:
+
+```text
+layer1_accumulation_linear_predictor_23nt
+
+layer1_accumulation_linear_predictor_24nt
+```
+
+implemented in the joined candidate table as the generic field:
 
 ```text
 layer1_accumulation_linear_predictor
-=
-β_hatᵀ Z_candidate
 ```
 
-where `Z_candidate` is the candidate sequence-feature vector after applying the frozen final encoding/scaling.
+with interpretation determined by `candidate_length_nt`.
 
-No viral nuisance intercept is added.
+Higher values mean greater predicted Varroa viral-small-RNA accumulation propensity **within that fitted length-specific model**.
 
-Higher = greater predicted Varroa viral-small-RNA accumulation propensity.
+The raw 23-nt and 24-nt scales must not be treated as directly interchangeable.
 
-This is not a predicted read count.
+---
 
-## 09A.19 Candidate-facing normalization
+## 09A.14 Candidate-facing normalization
 
-Normalize the final raw Layer-1 prediction separately within:
+Within each:
 
 ```text
 target × candidate_length
 ```
 
-to obtain:
+convert the raw Layer-1 sequence score to the canonical favourable percentile.
+
+Thus:
 
 ```text
-layer1_accumulation_percentile
+23-nt candidates are ranked only against 23-nt candidates
+24-nt candidates are ranked only against 24-nt candidates
 ```
 
-23 nt and 24 nt are never normalized together.
+No cross-length normalization is allowed.
 
-No automatic length bonus is introduced.
-
-## 09A.20 External validation
-
-Muita and Damayo synthetic treatment datasets are external validation only.
-
-Current Muita CHH work is exploratory because the true administered trigger sequence is not publicly available.
-
-No external validation result may alter fitted Stage 09A coefficients post hoc.
+No automatic 23- or 24-nt bonus is introduced.
 
 ---
+
+## 09A.15 Representation evidence
+
+Stage 09A does not fit a new representation model.
+
+Representation evidence remains available from:
+
+- Stage 07 representation analyses;
+- Stage 09A training/accounting tables;
+- represented fractions of the frozen theoretical opportunity universe.
+
+This evidence supports the biological interpretation that sequence composition affects whether small-RNA products are recovered, but it is not independently added to the primary Layer-1 accumulation score.
+
+---
+
+## 09A.16 External validation
+
+Muita observations must not be used for:
+
+- fitting Stage 09A;
+- predictor selection;
+- modifying coefficients after inspection;
+- choosing candidate scores.
+
+The existing Muita CHH analysis remains exploratory because the true author-defined administered trigger sequence is not publicly available.
+
+When exact Muita trigger sequences become available:
+
+```text
+freeze the Stage 09A models first
+apply the appropriate length-specific model unchanged
+evaluate external treatment libraries
+do not refit against Muita
+```
+
+The same principle applies to future Damayo synthetic-dsRNA datasets.
 
 # 09B — Layer 2: guide competence / strand-selection biophysics
 
@@ -2036,14 +2043,14 @@ Stage 10 will address:
 results/09_feature_layers/
 │
 ├── 09A_layer1_accumulation/
-│   ├── layer1_model_coefficients.tsv
-│   ├── layer1_model_preprocessing.tsv
-│   ├── layer1_model_selection.tsv
-│   ├── layer1_cv_by_group.tsv
+│   ├── layer1_training_accounting.tsv
+│   ├── layer1_coefficients_23nt.tsv
+│   ├── layer1_coefficients_24nt.tsv
+│   ├── layer1_leave_one_virus_out.tsv
 │   ├── layer1_cv_summary_23nt.tsv
 │   ├── layer1_cv_summary_24nt.tsv
-│   ├── layer1_representation_diagnostic.tsv
-│   ├── layer1_architecture_benchmarks.tsv
+│   ├── layer1_coefficient_stability.tsv
+│   ├── layer1_model_provenance.tsv
 │   └── candidate_layer1.tsv
 │
 ├── 09B_layer2_guide_competence/
@@ -2129,13 +2136,11 @@ random_seed
 ViennaRNA version
 RNAplfold parameter sets
 thermodynamic parameter resource/version
-Stage 09 model family
-Stage 09 predictor encoding/scaling
-Stage 09 sample-weighting rule
-Stage 09 nuisance-intercept treatment
-Stage 09 CV scheme
-Stage 09 model-structure choice
-Stage 09 hyperparameters
+Stage 09A length-specific model family
+Stage 09A predictor encoding
+Stage 09A sample-weighting rule
+Stage 09A nuisance fixed-effect definition
+Stage 09A leave-one-virus/family-out validation grouping
 ```
 
 Each run records:
@@ -2237,16 +2242,16 @@ Each run records:
 - exact guide orientation;
 - exact eight predictors;
 - no Stage 08 leakage into Layer 1;
-- held-out-group leakage prevention;
-- exact sample-aware weight regression;
-- exact training-only feature scaling;
-- exact fixed-effect within-group centering for accumulation model;
-- unpenalized nuisance intercept handling;
-- hyperparameter-grid and tie-break regression;
-- 23/24 validation separate;
+- exact sample-aware weight calculation;
+- weighted fixed-effect regression equivalence on synthetic data;
+- five leave-one-virus/family-out folds only;
+- no nested CV or hyperparameter search;
+- held-out virus/family leakage prevention;
+- 23/24 models fitted separately;
+- 23/24 validation summaries separate;
 - 23/24 normalization separate;
-- shared coefficients do not imply pooled analysis;
-- representation remains diagnostic;
+- coefficient-stability summary reuses existing holdout fits;
+- representation not refitted or double-counted;
 - Layer-2 favourable directions;
 - Layer-3 favourable directions;
 - neutral 0.5 references exact;
@@ -2290,8 +2295,8 @@ The canonical build is successful when:
 4. Stage 06 generically enumerates requested transcript candidate lengths;
 5. Stage 07 reconstructs matched-background empirical guide-sequence associations;
 6. Stage 08 preserves every candidate while computing raw biophysics;
-7. Stage 09A learns a leakage-free empirical accumulation layer using the eight specified predictors;
-8. 23 nt and 24 nt remain separate analyses even if Stage 09A shares coefficients;
+7. Stage 09A learns two transparent length-specific empirical accumulation models using the eight specified predictors;
+8. 23 nt and 24 nt remain separate analyses for fitting, validation and normalization;
 9. Stage 09B and 09C generate length-stratified normalized evidence layers;
 10. no Muita/Damayo external result influences training;
 11. no arbitrary cross-layer efficacy weighting is introduced in Stage 09;
@@ -2314,6 +2319,5 @@ The canonical build is successful when:
 - Wang PY, Bartel DP. 2024. *The guide-RNA sequence dictates the slicing kinetics and conformational dynamics of the Argonaute silencing complex.* Molecular Cell 84:2918–2934.e11. DOI: `10.1016/j.molcel.2024.06.026`.
 - Ruijtenberg S et al. 2020. *mRNA structural dynamics shape Argonaute-target interactions.* Nature Structural & Molecular Biology 27:790–801. DOI: `10.1038/s41594-020-0461-1`.
 - Cedden D, Güney G, Rostás M, Bucher G. 2025. *Optimizing dsRNA sequences for RNAi in pest control and research with the dsRIP web platform.* BMC Biology 23:114. DOI: `10.1186/s12915-025-02219-6`.
-- Zou H, Hastie T. 2005. *Regularization and variable selection via the elastic net.* JRSS B 67:301–320. DOI: `10.1111/j.1467-9868.2005.00503.x`.
 
 Evidence from non-Varroa systems is used as mechanistic/comparative support only. Their numerical coefficients are not transferred into the canonical Varroa empirical model.

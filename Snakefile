@@ -17,6 +17,7 @@ include: "workflow/rules/stage05.smk"
 include: "workflow/rules/stage06.smk"
 include: "workflow/rules/stage07.smk"
 include: "workflow/rules/stage08.smk"
+include: "workflow/rules/stage09a.smk"
 
 
 rule all:
@@ -115,3 +116,14 @@ rule all:
         "results/08_candidate_biophysics/candidate_biophysics.tsv",
         "results/08_candidate_biophysics/stage08_parameters.tsv",
         "results/08_candidate_biophysics/stage08_qc.tsv",
+        "results/09_feature_layers/09A_layer1_accumulation/layer1_model_coefficients.tsv",
+        "results/09_feature_layers/09A_layer1_accumulation/layer1_model_preprocessing.tsv",
+        "results/09_feature_layers/09A_layer1_accumulation/layer1_model_selection.tsv",
+        "results/09_feature_layers/09A_layer1_accumulation/layer1_cv_by_group.tsv",
+        "results/09_feature_layers/09A_layer1_accumulation/layer1_cv_summary_23nt.tsv",
+        "results/09_feature_layers/09A_layer1_accumulation/layer1_cv_summary_24nt.tsv",
+        "results/09_feature_layers/09A_layer1_accumulation/layer1_representation_diagnostic.tsv",
+        "results/09_feature_layers/09A_layer1_accumulation/layer1_architecture_benchmarks.tsv",
+        "results/09_feature_layers/09A_layer1_accumulation/candidate_layer1.tsv",
+        "results/09_feature_layers/stage09_parameters.tsv",
+        "results/09_feature_layers/stage09_qc.tsv",
