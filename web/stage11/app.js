@@ -1,6 +1,12 @@
 "use strict";
 
 const METRICS = new Set(["layer1", "layer2", "layer3", "total"]);
+const METRIC_LABELS = {
+  layer1: "Varroa Accumulation",
+  layer2: "Guide Competence",
+  layer3: "Target Accessibility",
+  total: "Combined Evidence",
+};
 const FEATURE_COLORS = { "5UTR": "rgba(64,145,108,0.10)", "CDS": "rgba(42,111,151,0.08)", "3UTR": "rgba(224,122,95,0.10)" };
 let payload;
 let scoreIndex;
@@ -89,18 +95,19 @@ function renderPlot(regions, state) {
     plot.innerHTML = '<p class="na">N/A — region length must be between the selected guide length and transcript length.</p>';
     return;
   }
-  const custom = regions.map(row => [row.end, row.feature || "N/A", row.guide, row.regionLength, row.metric, row.contained]);
+  const metricLabel = METRIC_LABELS[state.metric];
+  const custom = regions.map(row => [row.end, row.feature || "N/A", row.guide, row.regionLength, metricLabel, row.contained]);
   const shapes = payload.target.annotations.map(item => ({
     type: "rect", xref: "x", yref: "paper", x0: item.start_1based, x1: item.end_1based,
     y0: 0, y1: 1, fillcolor: FEATURE_COLORS[item.feature] || "rgba(0,0,0,.04)", line: { width: 0 }, layer: "below",
   }));
   Plotly.react(plot, [{
     x: regions.map(row => row.start), y: regions.map(row => row.score), customdata: custom,
-    mode: "lines", line: { color: "#087f72", width: 2 },
+    name: metricLabel, mode: "lines", line: { color: "#087f72", width: 2 },
     hovertemplate: "Start %{x}<br>End %{customdata[0]}<br>Feature %{customdata[1]}<br>Guide %{customdata[2]} nt<br>Region %{customdata[3]} nt<br>Metric %{customdata[4]}<br>Mean %{y:.6f}<br>Windows %{customdata[5]}<extra></extra>",
   }], {
-    title: `${payload.target.display_name} · ${state.metric} · ${state.guide}-nt guides · ${state.region}-nt regions`,
-    xaxis: { title: "Region start position (nt)" }, yaxis: { title: "Mean contained-window score", range: [0, 1] },
+    title: `${payload.target.display_name} · ${metricLabel} · ${state.guide}-nt guides · ${state.region}-nt regions`,
+    xaxis: { title: "Region start position (nt)" }, yaxis: { title: `Mean ${metricLabel} score`, range: [0, 1] },
     shapes, margin: { t: 70, r: 25, b: 60, l: 65 }, paper_bgcolor: "#fff", plot_bgcolor: "#fff",
   }, { responsive: true, displaylogo: false });
 }
@@ -119,8 +126,9 @@ function tableRows(rows) {
     : `<tr><td>${index + 1}</td><td colspan="3" class="na">N/A</td></tr>`).join("");
 }
 
-function renderTables(regions) {
+function renderTables(regions, metricLabel) {
   const container = document.getElementById("feature-tables");
+  document.getElementById("tables-title").textContent = `Top and bottom regions by starting feature · ${metricLabel}`;
   container.innerHTML = ["5UTR", "CDS", "3UTR"].map(feature => {
     const top = rankedRows(regions, feature, true);
     const bottom = rankedRows(regions, feature, false);
@@ -141,7 +149,7 @@ function update() {
     ? `${regions.length} valid starts; ${region - guide + 1} fully contained ${guide}-nt windows per region.`
     : `N/A — choose a region length from ${guide} to ${payload.target.transcript_length_nt} nt.`;
   renderPlot(regions, state);
-  renderTables(regions);
+  renderTables(regions, METRIC_LABELS[metric]);
   if (regions.length) updateUrl(state);
 }
 

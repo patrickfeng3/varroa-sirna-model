@@ -215,3 +215,19 @@ def test_direct_file_payload_avoids_fetch_requirement():
     assert '<script src="data/Vd_CHIBIN_stage11.js" defer></script>' in html
     assert "if (window.STAGE11_PAYLOAD)" in javascript
     assert "--web-data-js" in rule
+
+
+def test_user_facing_metric_labels_preserve_internal_keys():
+    html = (REPO / "web/stage11/index.html").read_text()
+    javascript = (REPO / "web/stage11/app.js").read_text()
+    expected = {
+        "layer1": "Varroa Accumulation",
+        "layer2": "Guide Competence",
+        "layer3": "Target Accessibility",
+        "total": "Combined Evidence",
+    }
+    for key, label in expected.items():
+        assert f'<option value="{key}">{label}</option>' in html
+        assert f'{key}: "{label}"' in javascript
+    assert 'new Set(["layer1", "layer2", "layer3", "total"])' in javascript
+    assert "metric: state.metric" in javascript
