@@ -1,7 +1,7 @@
 # Varroa vsiRNA Metric Dictionary
 
-**Version:** 0.21  
-**Scope:** Canonical metrics from Stage 01 through Stage 10A individual-window integration  
+**Version:** 0.22  
+**Scope:** Canonical metrics from Stage 01 through Stage 11 interactive region exploration  
 **Rule:** Every important statistic must have a documented definition, analysis unit, direction, normalization, interpretation and limitation.
 
 ---
@@ -52,7 +52,7 @@ All candidates sharing:
 target_id × candidate_length_nt
 ```
 
-Canonical unit for Stage 09 normalization and Stage 10A ranking.
+Canonical unit for Stage 09 normalization, Stage 10A ranking, and selected-length Stage 11 region aggregation.
 
 ---
 
@@ -1936,35 +1936,482 @@ Construct-level metrics belong to Stage 11 or later.
 
 ---
 
-# 27. Stage 11 future region-selection status
+# 27. Stage 11 region-exploration metrics
 
-Stage 11 is reserved for user-configurable longer-region selection and visualization.
+## `stage11_guide_length_nt`
 
-Current intended user parameters:
-
-```text
-desired_region_length_nt
-selection_direction = highest / lowest
-number_of_regions_to_return
-```
-
-Current intended primary region statistic:
+Selected Stage 10A candidate-window length:
 
 ```text
-mean of contained Stage 10 window scores
+L
 ```
 
-This is not yet a canonical metric in v0.21 because the precise treatment of multiple candidate lengths, overlap rules, region boundaries, negative controls, and visualization outputs remains to be specified.
+Current supported Varroa values:
 
-Stage 11 must consume Stage 10A outputs rather than recompute upstream biology.
+```text
+23
+24
+```
+
+Only candidates of the selected length enter a Stage 11 region score.
+
+## `stage11_region_length_nt`
+
+User-selected longer-region length:
+
+```text
+R
+```
+
+Positive integer.
+
+A canonical region score exists only when:
+
+```text
+R >= stage11_guide_length_nt
+R <= transcript_length_nt
+```
+
+## `stage11_metric_mode`
+
+Selected candidate-level Stage 10A score used in the region mean.
+
+Allowed canonical values:
+
+```text
+layer1
+layer2
+layer3
+total
+```
+
+Exact mapping:
+
+```text
+layer1 -> stage10_layer1_percentile
+layer2 -> stage10_layer2_percentile
+layer3 -> stage10_layer3_percentile
+total  -> stage10_equal_layer_score
+```
+
+## `stage11_region_start_1based`
+
+1-based inclusive start coordinate `s` of a longer region.
+
+## `stage11_region_end_1based`
+
+```text
+s + R - 1
+```
+
+1-based inclusive.
+
+A region is valid only when:
+
+```text
+stage11_region_end_1based <= transcript_length_nt
+```
+
+## `stage11_region_n_contained_windows`
+
+Number of selected-length Stage 10A candidate windows fully contained in one valid longer region.
+
+For the exhaustive canonical candidate universe:
+
+```text
+R - L + 1
+```
+
+where:
+
+```text
+R = stage11_region_length_nt
+L = stage11_guide_length_nt
+```
+
+This is a QC invariant.
+
+## `stage11_region_mean_score`
+
+Primary Stage 11 region statistic.
+
+For selected Stage 10A metric `M`:
+
+```text
+mean(
+    M_i
+    for every selected-L candidate i
+    satisfying:
+
+    candidate_start >= region_start
+    candidate_end   <= region_end
+)
+```
+
+Higher = more favourable.
+
+No weighting among contained candidate windows.
+
+No additional smoothing.
+
+No Pareto/minimum-layer contribution.
+
+Metric class:
+
+```text
+Canonical
+Project-specific region aggregation
+```
+
+Interpretation:
+
+> mean Stage 10A evidence quality of all selected-length candidate windows fully contained in the requested longer region.
+
+Not an efficacy probability.
+
+## `stage11_region_start_feature`
+
+Transcript feature containing `stage11_region_start_1based`.
+
+Current values:
+
+```text
+5UTR
+CDS
+3UTR
+```
+
+Canonical rule:
+
+> assignment depends only on the region starting nucleotide.
+
+A region may extend into the next transcript feature without changing this field.
+
+## `stage11_region_sequence`
+
+Exact transcript subsequence:
+
+```text
+transcript[
+    stage11_region_start_1based :
+    stage11_region_end_1based
+]
+```
+
+using 1-based inclusive biological coordinates.
+
+Presentation field; not a score.
+
+## `stage11_valid_region_count`
+
+For valid:
+
+```text
+R >= L
+R <= T
+```
+
+where `T` is transcript length:
+
+```text
+T - R + 1
+```
+
+Otherwise:
+
+```text
+0
+```
+
+## `stage11_top5_region`
+
+Presentation selection within one:
+
+```text
+stage11_region_start_feature
+```
+
+for the current:
+
+```text
+guide length
+region length
+metric mode
+```
+
+The five regions with highest `stage11_region_mean_score`.
+
+Overlapping regions are allowed.
+
+If fewer than five valid regions exist, return all available rows and represent unavailable rows as `N/A`.
+
+## `stage11_bottom5_region`
+
+Equivalent selection of the five lowest-scoring regions.
+
+Overlapping regions are allowed.
+
+## `stage11_display_tie_order`
+
+When two region scores are numerically identical, lower start coordinate is used only to make top/bottom table display order deterministic.
+
+This is not a scientific ranking metric and does not alter the tied scores.
 
 ---
 
-# 28. External validation status
+# 28. Stage 11 visualization semantics
 
-Muita CHH/Pero observations are not Stage 09 or Stage 10 training inputs.
+## `stage11_plot_x`
 
-The current Muita CHH analysis is exploratory because the true author-defined administered trigger sequence is unavailable.
+Canonical graph x value:
+
+```text
+stage11_region_start_1based
+```
+
+Axis label:
+
+```text
+Region start position (nt)
+```
+
+## `stage11_plot_y`
+
+Canonical graph y value:
+
+```text
+stage11_region_mean_score
+```
+
+## `stage11_natural_smoothing_window_count`
+
+```text
+stage11_region_n_contained_windows
+=
+R - L + 1
+```
+
+This is the number of individual Stage 10A windows averaged into each plotted region score.
+
+There is no separate smoothing parameter.
+
+Special case:
+
+```text
+R = L
+```
+
+gives one contained candidate window and therefore reproduces the underlying individual Stage 10A score exactly.
+
+## `stage11_annotation_band`
+
+Background transcript-feature interval used in the graph.
+
+Required logical fields:
+
+```text
+feature
+start_1based
+end_1based
+```
+
+Current expected features:
+
+```text
+5UTR
+CDS
+3UTR
+```
+
+The annotation band is visual metadata and does not modify scores.
+
+---
+
+# 29. Stage 11 web-export / provenance fields
+
+## `stage11_web_schema_version`
+
+Version identifier for the static front-end data contract.
+
+Canonical v0.22 recommendation:
+
+```text
+stage11-web-v1
+```
+
+Any incompatible schema change requires a new value.
+
+## `stage11_source_stage10_git_commit`
+
+Git commit identifying the canonical Stage 10A source used to produce the web export.
+
+## `stage11_source_stage10_file_sha256`
+
+SHA-256 identity of the Stage 10A source table used by the exporter.
+
+## `stage11_transcript_sequence_sha256`
+
+SHA-256 identity of the exported transcript sequence.
+
+## `stage11_supported_guide_lengths`
+
+Guide lengths whose required Stage 10A metrics are present in the export.
+
+Current Varroa values:
+
+```text
+23
+24
+```
+
+The UI should populate its guide-length control from this field where practical.
+
+## `stage11_share_state`
+
+Optional URL-query representation of the current interactive state.
+
+Canonical keys:
+
+```text
+guide
+region
+metric
+```
+
+Example logical state:
+
+```text
+guide=24
+region=96
+metric=total
+```
+
+This is UI state, not a biological metric.
+
+Invalid values must not silently alter scientific definitions; the UI should reject them or fall back to documented defaults.
+
+---
+
+# 30. Stage 11 static-site architecture status
+
+The canonical Stage 11 presentation layer is static HTML/CSS/JavaScript.
+
+Recommended source layout:
+
+```text
+web/stage11/
+    index.html
+    app.js
+    styles.css
+    data/<target_id>_stage11.json
+```
+
+The minimal web export is a derived presentation artifact.
+
+The canonical Stage 10A TSV remains the scientific source of truth.
+
+The static app must not require:
+
+```text
+database
+backend API
+live Python process
+analysis workstation
+```
+
+after publication.
+
+GitHub Pages is the current recommended lightweight publication target.
+
+A later integrated front-end may reuse the same schema and calculations.
+
+---
+
+# 31. Mandatory candidate-length separation rule
+
+Current empirically supported Varroa canonical lengths:
+
+```text
+23 nt
+24 nt
+```
+
+The following remain separate by candidate length:
+
+```text
+Stage 09 validation
+Stage 09 normalization
+Stage 10 layer-level percentile transforms
+Stage 10 equal-layer ranks
+Stage 10 Pareto fronts
+Stage 11 region aggregation
+Stage 11 graph series
+Stage 11 top/bottom region tables
+```
+
+A Stage 11 region score uses exactly one selected candidate length at a time.
+
+No region score averages 23-nt and 24-nt windows together.
+
+---
+
+# 32. Future user-configurable length status
+
+The generic software architecture must allow:
+
+```text
+candidate_length = L
+```
+
+rather than permanently hard-code only 23/24.
+
+For a future user-selected length, each metric/model should have an evidence status such as:
+
+```text
+validated
+generic_calculation
+extrapolated
+unsupported
+```
+
+The current Stage 09A empirical models are separately trained and validated for 23 nt and 24 nt.
+
+Stage 10A may integrate another length only if the required Stage 09 layer values exist.
+
+Stage 11 may visualize another length only if that length's canonical Stage 10A values are present in the exported payload.
+
+If multiple lengths exist, the Stage 11 UI selects one at a time unless a future specification explicitly defines cross-length aggregation.
+
+---
+
+# 33. Metrics deliberately not defined in Stage 11
+
+Do not define in Stage 11:
+
+```text
+efficacy_probability
+predicted_knockdown_percent
+mortality_probability
+AGO_loading_probability
+mixed_23_24_region_score
+construct_score
+junction_penalty_score
+concatenation_score
+delivery_score
+dose_response_score
+```
+
+`stage11_region_mean_score` is an evidence aggregation metric only.
+
+It must not be relabelled as measured or predicted efficacy.
+
+---
+
+# 34. External validation status
+
+Muita CHH/Pero observations are not Stage 09, Stage 10 or Stage 11 training inputs.
+
+The current Muita CHH analysis remains exploratory because the true author-defined administered trigger sequence is unavailable.
 
 When exact trigger sequences become public:
 
@@ -1977,11 +2424,11 @@ do not retune against Muita
 
 The same principle applies to future Damayo synthetic-treatment data.
 
-External data must not be used opportunistically to choose Stage 10 cross-layer weights after seeing candidate outcomes.
+External data must not be used opportunistically to choose Stage 10 cross-layer weights or Stage 11 aggregation rules after seeing candidate outcomes.
 
 ---
 
-# 29. Rule for introducing a new metric
+# 35. Rule for introducing a new metric
 
 Every future metric must document:
 
@@ -2005,7 +2452,7 @@ No important statistic should exist only inside code.
 
 ---
 
-# 30. Main methodological references
+# 36. Main methodological / software references
 
 - Murcott B et al. 2022. *stepRNA: Identification of Dicer cleavage signatures and passenger strand lengths in small RNA sequences.* Frontiers in Bioinformatics 2:994871. DOI `10.3389/fbinf.2022.994871`.
 - Benjamini Y, Hochberg Y. 1995. *Controlling the False Discovery Rate.* JRSS B 57:289–300.
@@ -2017,6 +2464,8 @@ No important statistic should exist only inside code.
 - Wang PY, Bartel DP. 2024. *The guide-RNA sequence dictates the slicing kinetics and conformational dynamics of the Argonaute silencing complex.* Molecular Cell. DOI `10.1016/j.molcel.2024.06.026`.
 - Ruijtenberg S et al. 2020. *mRNA structural dynamics shape Argonaute-target interactions.* NSMB. DOI `10.1038/s41594-020-0461-1`.
 - Cedden D et al. 2025. *Optimizing dsRNA sequences for RNAi in pest control and research with the dsRIP web platform.* BMC Biology 23:114. DOI `10.1186/s12915-025-02219-6`.
+- GitHub Docs. *GitHub Pages* and *Configuring a publishing source for your GitHub Pages site.* Static-site deployment guidance, accessed 2026-08-16.
+- Plotly. *Plotly JavaScript Open Source Graphing Library* and JavaScript configuration documentation, accessed 2026-08-16.
 
 Evidence imported from non-Varroa systems remains mechanistic/comparative support only unless separately validated in Varroa.
 

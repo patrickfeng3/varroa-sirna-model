@@ -1,10 +1,10 @@
 # Canonical Varroa vsiRNA Pipeline Specification
 
-**Specification version:** 0.21  
-**Status:** Stages 00–09 implemented and validated; Stage 10A specified as the canonical individual-window integration and ranking layer; Stage 11 reserved for future region selection and visualization  
-**Scope:** Canonical viral small-RNA analysis, generic transcript candidate enumeration, empirical Varroa guide-sequence association, candidate biophysics, Stage 09 three-layer evidence synthesis, and Stage 10A individual-window integration  
+**Specification version:** 0.22  
+**Status:** Stages 00–10A implemented and validated; Stage 11 specified as the lightweight interactive region-exploration and visualization layer  
+**Scope:** Canonical viral small-RNA analysis, generic transcript candidate enumeration, empirical Varroa guide-sequence association, candidate biophysics, Stage 09 three-layer evidence synthesis, Stage 10A individual-window integration, and Stage 11 interactive region exploration  
 **Host transitivity:** Excluded from current canonical build  
-**Individual candidate-window ranking:** Stage 10A; **region/construct selection:** deferred to Stage 11 or later
+**Individual candidate-window ranking:** Stage 10A; **interactive region exploration/selection:** Stage 11; **construct architecture:** deferred to a later stage
 
 ---
 
@@ -2675,42 +2675,899 @@ Until then:
 
 ---
 
-# 11. Reserved future stage — region selection and visualization
+# 11 — Interactive region exploration and visualization
 
-Stage 11 is deliberately not implemented or fully frozen in v0.21.
+## 11.1 Purpose
 
-Its intended question is:
+Stage 11 is the first user-facing exploration layer.
 
-> Given the individual-window rankings from Stage 10A, which longer target regions contain the most favourable population of candidate windows?
+It asks:
 
-Expected user-facing parameters include:
+> For a user-selected guide length, longer region length, and evidence metric, how does the mean quality of all contained Stage 10A candidate windows vary across the transcript?
+
+Stage 11 consumes frozen Stage 10A individual-window scores.
+
+It does not recalculate biological evidence.
+
+The current Stage 11 design serves two purposes:
+
+1. provide a lightweight browser tool that the project team can use immediately;
+2. define a clean data/algorithm contract that can later be reused inside the broader Nectar Designer / Theo front-end.
+
+Stage 11 is therefore both:
 
 ```text
-desired_region_length_nt
-selection_direction = highest / lowest
-number_of_regions_to_return
+scientific region-aggregation logic
++
+static interactive presentation
 ```
 
-Possible future transcript-region restrictions may also be supported.
-
-The current design intention is to summarize contained Stage 10 window scores using the **mean** as the primary region-level statistic, consistent with the project's earlier sliding-region analyses and conceptually similar to long-region aggregation used by dsRIP.
-
-However, the exact treatment of:
-
-- 23-nt versus 24-nt information within a region;
-- overlapping selected regions;
-- lowest-score negative-control regions;
-- region boundary rules;
-- graphical summaries;
-- construct architecture;
-
-must be specified before Stage 11 implementation.
-
-Stage 11 must consume Stage 10A outputs rather than recompute Stage 08–10 biology.
+The scientific logic must remain separable from the presentation code.
 
 ---
 
-# 12. Future website / app extensibility principle
+## 11.2 Core design principle
+
+Stage 11 must be:
+
+```text
+static
+client-side
+deterministic
+lightweight
+shareable
+```
+
+The canonical implementation requires no application server, database, Python process, or connection to the analysis workstation after deployment.
+
+The current deployment target may be GitHub Pages or another static web host.
+
+GitHub Pages is suitable because it can publish static HTML, CSS and JavaScript directly from repository content, including deployment through GitHub Actions.
+
+The canonical UI source should therefore be ordinary:
+
+```text
+HTML
+CSS
+JavaScript
+```
+
+with a small derived data export.
+
+No React/Node/backend framework is required for the canonical Stage 11 implementation.
+
+A later external front-end may reimplement the same documented calculations while consuming the same schema.
+
+---
+
+## 11.3 Scientific inputs
+
+Stage 11 reads Stage 10A candidate-level data only.
+
+For the currently supported metric modes:
+
+```text
+Layer 1:
+    stage10_layer1_percentile
+
+Layer 2:
+    stage10_layer2_percentile
+
+Layer 3:
+    stage10_layer3_percentile
+
+Total:
+    stage10_equal_layer_score
+```
+
+Stage 11 must not read raw Stage 08 values directly.
+
+Stage 11 must not refit Stage 09A or recompute Stage 09B/09C/10A.
+
+Additional required metadata:
+
+```text
+target_id
+transcript length
+transcript sequence
+transcript annotation boundaries
+candidate length
+candidate start/end
+candidate ID
+```
+
+Transcript annotations required for the current interface:
+
+```text
+5′ UTR
+CDS
+3′ UTR
+```
+
+Annotation boundaries must come from the canonical transcript preparation/annotation source and must not be hard-coded independently in JavaScript.
+
+---
+
+## 11.4 User controls
+
+The minimum interface contains three controls.
+
+### Guide-window length
+
+```text
+guide_length_nt
+```
+
+For the current Varroa model:
+
+```text
+23
+24
+```
+
+The control should be populated from the exported data rather than hard-coded where practical.
+
+The selected guide length determines which Stage 10A candidate population is used.
+
+23-nt and 24-nt scores are never mixed in one region score.
+
+### Desired longer-region length
+
+```text
+region_length_nt = R
+```
+
+Positive integer entered by the user.
+
+Examples:
+
+```text
+24
+48
+96
+200
+```
+
+The interface recalculates immediately when `R` changes.
+
+### Metric
+
+```text
+metric_mode
+```
+
+Allowed canonical values:
+
+```text
+layer1
+layer2
+layer3
+total
+```
+
+Mapping:
+
+```text
+layer1 -> stage10_layer1_percentile
+layer2 -> stage10_layer2_percentile
+layer3 -> stage10_layer3_percentile
+total  -> stage10_equal_layer_score
+```
+
+Changing the metric updates both the graph and the top/bottom region tables.
+
+---
+
+## 11.5 Valid longer regions
+
+Let:
+
+```text
+T = transcript length
+L = selected guide-window length
+R = selected longer-region length
+s = longer-region start coordinate
+e = s + R - 1
+```
+
+Coordinates are 1-based inclusive.
+
+A longer region is valid only if:
+
+```text
+R >= L
+1 <= s <= T - R + 1
+e <= T
+```
+
+For a valid region, the set of contained Stage 10A candidate windows is:
+
+```text
+W(s,R,L)
+=
+all L-nt Stage 10A candidates satisfying
+
+candidate_start >= s
+and
+candidate_end <= e
+```
+
+Because Stage 06 exhaustively enumerates all valid candidate starts and Stages 08–10 preserve them, a complete valid region must contain exactly:
+
+```text
+R - L + 1
+```
+
+candidate windows of the selected length.
+
+This expected count is a Stage 11 QC invariant.
+
+If:
+
+```text
+R < L
+```
+
+or:
+
+```text
+R > T
+```
+
+there are no valid Stage 11 longer regions.
+
+The UI must show an informative `N/A` / no-valid-region state rather than fabricate or extrapolate a value.
+
+---
+
+## 11.6 Primary region score
+
+For selected metric `M`, the canonical score of valid region `(s,e)` is:
+
+```text
+stage11_region_mean_score
+=
+mean(
+    M_i
+    for all selected-L candidate windows i
+    fully contained in s..e
+)
+```
+
+No candidate is weighted more strongly than another.
+
+No Pareto-front weight is added.
+
+No minimum-layer penalty is added.
+
+No endpoint penalty is added.
+
+No extra smoothing kernel is applied.
+
+The mean is the canonical region statistic.
+
+This is conceptually aligned with the project's previous sliding-region analyses and with published long-dsRNA approaches that summarize the quality of constituent short interfering windows.
+
+---
+
+## 11.7 Natural smoothing rule
+
+The requested region length provides the smoothing.
+
+There is **no independent smoothing parameter**.
+
+When:
+
+```text
+R = L
+```
+
+each valid region contains exactly one Stage 10A window, so:
+
+```text
+stage11_region_mean_score
+=
+the corresponding individual Stage 10A window score
+```
+
+When:
+
+```text
+R > L
+```
+
+the plotted series becomes a moving mean across:
+
+```text
+R - L + 1
+```
+
+contained Stage 10A windows.
+
+Therefore larger requested regions naturally produce smoother positional profiles.
+
+Do not additionally apply:
+
+```text
+LOESS
+Savitzky-Golay
+Gaussian smoothing
+extra rolling means
+arbitrary interpolation
+```
+
+to the canonical score series.
+
+Plotly or another graphing library may visually connect adjacent valid start positions with lines; this does not alter the underlying numerical scores.
+
+---
+
+## 11.8 Transcript-feature classification
+
+Each valid longer region is assigned to a display/ranking feature according to the annotation containing its **starting nucleotide**.
+
+Canonical field:
+
+```text
+stage11_region_start_feature
+```
+
+Allowed current values:
+
+```text
+5UTR
+CDS
+3UTR
+```
+
+Canonical rule:
+
+> The starting coordinate determines the feature assignment even when the longer region extends across the next annotation boundary.
+
+Example:
+
+```text
+region starts in 5′ UTR
+region ends in CDS
+=> stage11_region_start_feature = 5UTR
+```
+
+The same rule applies to CDS regions extending into the 3′ UTR.
+
+A region is not excluded merely because it crosses an annotation boundary.
+
+The only transcript-end restriction is:
+
+```text
+region_end <= transcript_length
+```
+
+If annotation metadata for a requested display feature is absent, that feature's ranking table shows `N/A`.
+
+---
+
+## 11.9 Interactive graph
+
+The main graph must update immediately when the user changes:
+
+```text
+guide_length_nt
+region_length_nt
+metric_mode
+```
+
+Canonical x-axis:
+
+```text
+longer-region start position (nt)
+```
+
+Canonical y-axis:
+
+```text
+mean contained-window score
+```
+
+The y-axis is on the native 0–1 score scale of the selected Stage 10A metric.
+
+The graph background must indicate:
+
+```text
+5′ UTR
+CDS
+3′ UTR
+```
+
+using lightly distinguished transcript-feature bands.
+
+Background coordinates come from the exported canonical annotation metadata.
+
+The graph should support ordinary browser interaction such as:
+
+```text
+hover
+zoom
+pan
+reset
+```
+
+A lightweight JavaScript charting library such as Plotly.js may be used.
+
+If Plotly.js is loaded from a CDN, use an explicit pinned version rather than an unversioned/"latest" bundle.
+
+Minimum dynamic title content:
+
+```text
+target
+metric
+guide length
+requested region length
+```
+
+Minimum hover information:
+
+```text
+region start
+region end
+start feature
+guide length
+region length
+metric
+mean score
+number of contained guide windows
+```
+
+Optional region sequence may also be shown.
+
+---
+
+## 11.10 Top-5 and bottom-5 region tables
+
+For the currently selected:
+
+```text
+guide_length_nt
+region_length_nt
+metric_mode
+```
+
+generate separate ranking tables for:
+
+```text
+5′ UTR
+CDS
+3′ UTR
+```
+
+Within each feature, include all valid longer regions whose **start coordinate** lies in that feature.
+
+Overlapping regions are allowed.
+
+Do not perform non-overlap filtering.
+
+For each feature show:
+
+```text
+top 5
+=
+five highest stage11_region_mean_score values
+
+bottom 5
+=
+five lowest stage11_region_mean_score values
+```
+
+Recommended displayed fields:
+
+```text
+display order
+region start–end
+mean score
+region sequence
+```
+
+If score ties occur, preserve the tied numerical value and use lower start coordinate only as a deterministic **display-order** tie-break.
+
+This display-order rule does not create a new biological score.
+
+If a feature contains:
+
+```text
+0 valid region starts
+```
+
+show:
+
+```text
+N/A
+```
+
+If it contains fewer than five valid starts, show all available regions and fill/label the remaining entries as `N/A`.
+
+---
+
+## 11.11 Minimal web-data export
+
+The browser must not load large pipeline outputs.
+
+Create a deterministic minimal Stage 11 export derived from canonical Stage 10A plus transcript metadata.
+
+Recommended schema version:
+
+```text
+stage11-web-v1
+```
+
+Minimum logical content:
+
+```text
+schema_version
+
+target:
+    target_id
+    display_name
+    transcript_length_nt
+    transcript_sequence
+    transcript_sequence_sha256
+    annotations:
+        feature
+        start_1based
+        end_1based
+
+supported_guide_lengths
+
+metrics:
+    layer1
+    layer2
+    layer3
+    total
+
+candidates:
+    candidate_id
+    candidate_length_nt
+    target_start_1based
+    target_end_1based
+    layer1
+    layer2
+    layer3
+    total
+
+provenance:
+    pipeline_spec_version
+    metric_dictionary_version
+    source_stage10_git_commit
+    source_stage10_file_sha256
+```
+
+Do not include unnecessary upstream data such as:
+
+```text
+FASTQ reads
+Bowtie alignments
+stepRNA output
+RNAplfold matrices
+RNAfold intermediates
+Stage 09A training universe
+raw Stage 08 feature tables
+```
+
+The web export is a presentation artifact.
+
+The canonical Stage 10A TSV remains the scientific source of truth.
+
+The export script must assert one-to-one agreement with the Stage 10A source values before writing the web payload.
+
+---
+
+## 11.12 Repository / static-site architecture
+
+Recommended canonical layout:
+
+```text
+web/stage11/
+├── index.html
+├── app.js
+├── styles.css
+└── data/
+    └── vd_chibin_stage11.json
+
+workflow/scripts/
+└── export_stage11_web_data.py
+
+tests/
+└── test_stage11.py
+```
+
+A static-site deployment workflow may publish `web/stage11/` to GitHub Pages.
+
+The exact hosting provider is not scientifically important.
+
+The following separation is important:
+
+```text
+pipeline
+=
+scientific source of truth
+
+export_stage11_web_data.py
+=
+deterministic compact serialization layer
+
+web/stage11/
+=
+interactive presentation layer
+```
+
+Scientific calculations must not become hidden only inside presentation-specific code.
+
+The region-scoring algorithm must be independently unit-testable outside the browser UI.
+
+---
+
+## 11.13 Shareability and URL state
+
+The deployed site should be usable from a normal shareable URL without requiring the developer's computer to be running.
+
+For reproducible sharing of a particular view, the current control state should be representable in URL query parameters where practical, for example:
+
+```text
+guide=24
+region=96
+metric=total
+```
+
+On page load:
+
+1. parse supplied query values;
+2. accept only supported/valid values;
+3. fall back to safe defaults for invalid values.
+
+When controls change, the page may update the query string using browser history APIs without reloading.
+
+This makes a selected analysis view bookmarkable/shareable while preserving a fully static implementation.
+
+---
+
+## 11.14 GitHub Pages publication
+
+For the current project, GitHub Pages is the recommended lightweight sharing target.
+
+The static site may be deployed from repository content using a GitHub Pages publishing configuration or a GitHub Actions Pages workflow.
+
+The Pages deployment must publish only the intended static site/export files.
+
+Deployment is not part of the scientific Snakemake DAG.
+
+A website update therefore follows:
+
+```text
+canonical pipeline result changes
+        ↓
+regenerate minimal Stage 11 web export
+        ↓
+run Stage 11 deterministic tests/QC
+        ↓
+commit updated web export/source
+        ↓
+static host republishes site
+```
+
+The user's local workstation is not required to remain online after publication.
+
+---
+
+## 11.15 Front-end integration contract
+
+Stage 11 is intentionally designed as a springboard for the broader Nectar Designer front-end.
+
+The scientific contract exposed to another front-end is:
+
+```text
+minimal versioned web-data schema
++
+documented region-score algorithm
++
+documented feature-assignment rule
++
+documented top/bottom ranking rule
+```
+
+Theo's front-end may:
+
+- use a different visual framework;
+- use React or another application framework;
+- style the interface differently;
+- combine this tool with target search and candidate-generation controls.
+
+It must not silently change the scientific definitions of:
+
+```text
+contained window
+region mean score
+guide-length separation
+metric mapping
+start-feature classification
+```
+
+without updating the canonical specification/version.
+
+This decouples the scientific engine from the user-interface implementation.
+
+---
+
+## 11.16 Stage 11 outputs
+
+Canonical generated scientific/export outputs:
+
+```text
+results/11_region_explorer/
+├── stage11_export_qc.tsv
+└── stage11_parameters.tsv
+```
+
+Canonical static publication files:
+
+```text
+web/stage11/
+├── index.html
+├── app.js
+├── styles.css
+└── data/
+    └── <target_id>_stage11.json
+```
+
+The browser-generated current graph and top/bottom tables are interactive views and do not need to be written as permanent pipeline files.
+
+Optional future export buttons may save a user's selected table/plot, but they are not required in v0.22.
+
+---
+
+## 11.17 Required deterministic QC/tests
+
+Stage 11 must test at minimum:
+
+### Source/export integrity
+
+- Stage 10A candidate IDs preserved exactly in the web export;
+- exported L1/L2/L3/total scores exactly match Stage 10A;
+- transcript sequence hash exact;
+- annotation coordinates exact;
+- only minimal required derived data exported;
+- schema version present.
+
+### Region enumeration
+
+For valid `R >= L` and `R <= T`:
+
+```text
+number of valid region starts
+=
+T - R + 1
+```
+
+For every valid region:
+
+```text
+number of contained L-nt windows
+=
+R - L + 1
+```
+
+Test:
+
+```text
+R = L
+```
+
+gives exact equality between the region score and the corresponding individual Stage 10A score.
+
+Test:
+
+```text
+R < L
+R > T
+```
+
+gives no valid region scores / `N/A`.
+
+### Score arithmetic
+
+- metric mapping exact for L1/L2/L3/total;
+- region mean arithmetic exact on hand-calculated synthetic data;
+- 23- and 24-nt candidates never mixed;
+- no Pareto/minimum-layer contribution to the canonical region mean;
+- no additional smoothing applied.
+
+### Annotation/ranking
+
+- start-feature classification exact at 5′UTR/CDS and CDS/3′UTR boundaries;
+- boundary-crossing regions remain assigned by start position;
+- transcript-end-invalid regions excluded;
+- overlapping top/bottom regions allowed;
+- top five and bottom five sorted correctly;
+- `N/A` emitted when a feature has no valid start;
+- fewer-than-five handling deterministic.
+
+### UI/data state
+
+- invalid guide length rejected/falls back safely;
+- invalid/non-positive region length rejected/falls back safely;
+- invalid metric rejected/falls back safely;
+- valid URL query state reproduces the selected controls.
+
+### Workflow safety
+
+- Stage 11 data export reads Stage 10A/transcript metadata only;
+- no Stage 00–10 recomputation;
+- no model fitting;
+- no RNAfold/RNAplfold/ViennaRNA;
+- no web deployment action inside the scientific Snakemake DAG.
+
+---
+
+## 11.18 Efficiency requirement
+
+Current Vd-CHIBIN data contain only:
+
+```text
+688 × 23-nt windows
+687 × 24-nt windows
+```
+
+Therefore Stage 11 computations are small.
+
+The implementation should:
+
+- load the minimal web payload once;
+- pre-index candidate scores by guide length/start coordinate;
+- calculate moving region means in the browser using simple array arithmetic;
+- preferentially use prefix sums or an equivalent O(T) method for each selected metric;
+- update the graph/tables without network requests after initial page load.
+
+A user-control change should feel effectively instantaneous.
+
+Do not introduce server-side computation merely to optimize a dataset of this size.
+
+---
+
+## 11.19 Scientific interpretation and limitations
+
+A Stage 11 region score means:
+
+> the mean Stage 10A evidence score of all selected-length candidate windows fully contained in that requested transcript region.
+
+It is not:
+
+```text
+predicted percentage knockdown
+probability the whole dsRNA will work
+Dicer-product abundance probability
+construct efficacy
+junction-adjusted score
+```
+
+Stage 11 does not model how a long dsRNA is physically processed into all possible products beyond the defined contained-window mean.
+
+It also does not yet model:
+
+- concatenated/repeated constructs;
+- artificial junction-spanning products;
+- mixed 23/24 processing in one scalar;
+- delivery;
+- dose;
+- stability;
+- off-target effects;
+- organism-level efficacy.
+
+Those questions require separately specified later stages.
+
+---
+
+# 12. Broader website / app extensibility principle
+
+The current Stage 11 static explorer is a lightweight project tool, not the final product architecture.
+
+The eventual website must remain parameter-driven and should reuse the scientific contracts defined in the pipeline.
 
 The current empirical Varroa model is scientifically characterized primarily for:
 
@@ -2719,17 +3576,13 @@ The current empirical Varroa model is scientifically characterized primarily for
 24 nt
 ```
 
-The eventual software/website must nevertheless be **parameter-driven**, not hard-coded to these lengths.
-
 A future user may request:
 
 ```text
 candidate_length = L nt
 ```
 
-For Varroa, the interface should recommend 23/24 nt because these are currently best supported by empirical data, but it should not prevent another choice such as 20 or 21 nt.
-
-The software should then run every scientifically applicable analysis for the requested length.
+The interface should recommend empirically supported settings without unnecessarily blocking other scientifically applicable calculations.
 
 Outputs should distinguish:
 
@@ -2742,14 +3595,17 @@ unsupported / unavailable model
 
 For example:
 
-- candidate enumeration can accept arbitrary positive requested lengths that fit within the transcript;
-- accessibility and folding calculations can be parameterized for other lengths subject to method constraints;
-- the current Stage 09A empirical accumulation model must not be silently described as validated at an untrained length;
-- Stage 10A can integrate a requested length only when the required Stage 09 layer inputs exist and their evidence status is reported.
+- candidate enumeration can accept arbitrary legal lengths;
+- accessibility/folding calculations can be parameterized subject to method constraints;
+- Stage 09A must not be labelled validated at an untrained length;
+- Stage 10A requires all three Stage 09 layers to define its canonical integrated score;
+- Stage 11 may visualize only lengths/metrics actually present in its exported data.
 
-If multiple user-requested lengths are analysed, each length remains its own normalization/analysis stratum unless a future validated specification explicitly says otherwise.
+The Stage 11 data schema should remain sufficiently generic that the same region-exploration component can later be embedded in a broader front-end after organism/gene/length selection.
 
-Recommended settings should guide users without unnecessarily restricting them.
+If multiple lengths are analysed, each length remains its own normalization/ranking stratum unless a future validated specification explicitly defines cross-length integration.
+
+Recommended settings should guide users without obscuring evidence status.
 
 ---
 
@@ -2781,6 +3637,11 @@ Stage 10A layer-level percentile transform
 Stage 10A equal-layer weights = 1/3,1/3,1/3
 Stage 10A Pareto dominance definition
 Stage 10A ranking stratum = target × candidate_length
+Stage 11 web schema version
+Stage 11 metric mapping
+Stage 11 region mean definition
+Stage 11 start-feature assignment rule
+Stage 11 static-site software/library versions
 ```
 
 Each run records:
@@ -2921,6 +3782,27 @@ Each run records:
 - no region aggregation or Stage 11 logic;
 - no efficacy-probability output.
 
+## Stage 11
+
+- exact Stage 10A-to-web-export score preservation;
+- transcript sequence/hash and annotation preservation;
+- valid-region start count `T-R+1`;
+- contained-window count `R-L+1`;
+- `R=L` exact individual-window regression;
+- `R<L` and `R>T` no-valid-region handling;
+- exact L1/L2/L3/total metric mapping;
+- exact mean-region arithmetic;
+- 23/24 guide-length isolation;
+- no extra smoothing;
+- start-feature boundary classification;
+- boundary-crossing region assignment by start nucleotide;
+- transcript-end exclusion;
+- overlapping top/bottom regions allowed;
+- top-five/bottom-five deterministic ordering;
+- `N/A` handling;
+- URL-state validation;
+- no upstream recomputation or deployment action in the scientific DAG.
+
 ---
 
 # 15. Explicitly superseded / excluded analyses
@@ -2941,8 +3823,8 @@ Currently outside scope:
 - host transitivity;
 - formal CHH/Pero Muita validation before true trigger release;
 - empirically fitted Stage 10 cross-layer efficacy weights;
-- Stage 11 Vd-CHIBIN region selection and visualization;
 - construct concatenation/junction scoring;
+- mixed-length construct-level integration;
 - full user-facing Nectar Designer implementation.
 
 ---
@@ -2961,14 +3843,19 @@ The canonical build is successful when:
 8. 23 nt and 24 nt remain separate analyses for fitting, validation and normalization;
 9. Stage 09B and 09C generate length-stratified normalized evidence layers;
 10. Stage 10A preserves all candidates and produces the canonical equal-layer individual-window ranking;
-11. Stage 10A also reports Pareto fronts and minimum-layer diagnostics without changing the primary ranking;
-12. no Muita/Damayo external result influences training or cross-layer weights;
-13. no borrowed or efficacy-fitted cross-layer coefficient is introduced without suitable Varroa outcome data;
-14. all important metrics are documented in `docs/METRIC_DICTIONARY.md`;
-15. all major calculations have deterministic tests;
-16. parameters/provenance are machine-readable;
-17. no upstream frozen input is modified;
-18. Stage 11 region selection remains separate until explicitly specified.
+11. Stage 10A reports Pareto fronts and minimum-layer diagnostics without changing the primary ranking;
+12. Stage 11 exports only the minimal Stage 10A/transcript data needed for interactive exploration;
+13. Stage 11 calculates longer-region scores as the exact mean of fully contained selected-length Stage 10A windows;
+14. Stage 11 assigns 5′UTR/CDS/3′UTR tables by the longer region's starting nucleotide;
+15. Stage 11 produces a static browser UI that updates guide length, region length and metric without upstream recomputation;
+16. the Stage 11 static publication can be shared independently of the analysis workstation;
+17. no Muita/Damayo external result influences training or cross-layer weights;
+18. no borrowed efficacy coefficient is introduced without suitable Varroa outcome data;
+19. all important metrics are documented in `docs/METRIC_DICTIONARY.md`;
+20. all major calculations have deterministic tests;
+21. parameters/provenance are machine-readable;
+22. no upstream frozen input is modified;
+23. construct/junction scoring remains outside Stage 11 until separately specified.
 
 ---
 ---
