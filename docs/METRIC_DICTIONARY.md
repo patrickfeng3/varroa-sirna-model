@@ -1,7 +1,7 @@
 # Varroa vsiRNA Metric Dictionary
 
-**Version:** 0.16  
-**Scope:** Canonical viral pipeline metrics through Stage 07 empirical single-nucleotide/regional-GC analysis, with Stage 08 candidate-biophysics metrics pre-specified
+**Version:** 0.17  
+**Scope:** Canonical viral pipeline metrics through Stage 07 empirical single-nucleotide/regional-GC analysis and post-hoc feature synthesis, with Stage 08 candidate-biophysics metrics pre-specified
 
 ---
 
@@ -3473,6 +3473,201 @@ optimal regional width
 regional efficacy score
 regional candidate rank
 ```
+
+
+## Stage 07 feature-synthesis definitions
+
+These post-hoc metrics summarize existing canonical Stage 07 outputs. They are evidence-management quantities, not independent validation, mechanistic proof, efficacy measures, or scoring terms. Unless stated otherwise, pair-level grouped metrics are aggregated by median across eligible viruses within each biological sample and then median across samples. The biological sample remains the top-level replicate.
+
+For every metric in this subsection:
+
+```text
+Stage 09 eligibility = evaluation only
+scoring_feature = NO
+```
+
+No weight, point, bonus, penalty, rank, or pseudocount is defined.
+
+### `guide_position_5p`
+
+**Class:** Physical guide coordinate  
+**Definition:** One-based position counted from the physical sequenced guide 5′ end.  
+**Unit:** nucleotide position  
+**Direction/interpretation:** Increases from guide 5′ to 3′.  
+**Aggregation:** Identifier; not aggregated.  
+**Evidence class:** Coordinate metadata.  
+**Limitation:** Does not imply a mechanistic cleavage or loading coordinate.
+
+### `guide_position_3p`
+
+**Class:** Derived physical guide coordinate  
+**Definition:** `guide_length_nt - guide_position_5p + 1`.  
+**Unit:** nucleotide position from the physical guide 3′ end  
+**Direction/interpretation:** `1` is 3p1; 23-nt position 21 and 24-nt position 22 are both 3p3.  
+**Aggregation:** Identifier; not aggregated.  
+**Evidence class:** Coordinate metadata.  
+**Limitation:** It is an alternative label for the same physical nucleotide, not a separate hypothesis.
+
+### `a3p3_indicator`
+
+**Class:** Compact guide-sequence feature  
+**Definition:** `1` when the physical guide 3p3 nucleotide is A; otherwise `0`.  
+**Unit:** binary indicator  
+**Direction/interpretation:** Higher values denote A at 3p3 only.  
+**Aggregation:** Candidate-level feature eligible for later evaluation.  
+**Evidence class:** Compact Varroa cross-length positional discovery.  
+**Limitation:** Association in total small-RNA data does not establish AGO loading or efficacy.
+
+### `w7_indicator`
+
+**Class:** Literature-guided grouped guide feature  
+**Definition:** `1` when physical guide position 7 is A or U; otherwise `0`. Canonical DNA-form TSV representation uses A or T.  
+**Unit:** binary indicator  
+**Direction/interpretation:** Presence of W7; no favourable direction is assumed for Varroa.  
+**Aggregation:** Candidate-level feature eligible only if retained after evidence synthesis.  
+**Evidence class:** `wang_bartel_2024_exploratory`.  
+**Limitation:** The external rationale is not independent validation in this dataset.
+
+### `r10_indicator`
+
+**Class:** Literature-guided grouped guide feature  
+**Definition:** `1` when physical guide position 10 is A or G; otherwise `0`.  
+**Unit:** binary indicator  
+**Direction/interpretation:** Presence of R10; representation and accumulation remain distinct evidence endpoints.  
+**Aggregation:** Candidate-level feature eligible for later evaluation.  
+**Evidence class:** `wang_bartel_2024_exploratory`.  
+**Limitation:** Positive representation is not equivalent to efficacy or disproportionate accumulation.
+
+### `w17_indicator`
+
+**Class:** Literature-guided grouped guide feature  
+**Definition:** `1` when physical guide position 17 is A or U; otherwise `0`. Canonical DNA-form TSV representation uses A or T.  
+**Unit:** binary indicator  
+**Direction/interpretation:** Presence of W17.  
+**Aggregation:** Candidate-level feature eligible for later evaluation.  
+**Evidence class:** `wang_bartel_2024_exploratory`.  
+**Limitation:** Total-small-RNA accumulation does not prove the proposed external mechanism.
+
+### `guide_gc_3p5_10`
+
+**Class:** Regional guide-composition feature  
+**Definition:** Number of G/C nucleotides across physical guide positions 3p5 through 3p10 divided by `6`.  
+**Unit:** fraction  
+**Direction/interpretation:** Higher values are more GC-rich; lower values are more AU-rich.  
+**Aggregation:** Candidate-level continuous feature eligible for later evaluation.  
+**Evidence class:** Fixed-width regional-GC synthesis.  
+**Limitation:** Overlapping regional and positional features are dependent and require redundancy evaluation.
+
+### `guide_au_3p5_10`
+
+**Class:** Regional guide-composition feature  
+**Definition:** `1 - guide_gc_3p5_10` for a valid A/C/G/U guide sequence.  
+**Unit:** fraction  
+**Direction/interpretation:** Higher values are more AU-rich.  
+**Aggregation:** Candidate-level continuous feature eligible for later evaluation.  
+**Evidence class:** Fixed-width regional-GC synthesis.  
+**Limitation:** It is exactly complementary to `guide_gc_3p5_10` and must not be treated as independent evidence.
+
+### `grouped_observed_fraction`
+
+**Class:** Pair-level grouped observed composition  
+**Definition:** Sum of the canonical Stage 07 observed fractions for all nucleotides belonging to the specified group at one physical position.  
+**Unit:** fraction  
+**Direction/interpretation:** Larger values mean the group occupies more of the observed population under the stated weighting mode.  
+**Aggregation:** Calculated per sample-virus before sample/dataset medians.  
+**Evidence class:** Grouped feature evidence.  
+**Limitation:** Unique-sequence and abundance modes are separate populations.
+
+### `grouped_expected_fraction`
+
+**Class:** Pair-level grouped matched-background composition  
+**Definition:** Sum of the corresponding matched viral-window expected fractions for all constituent nucleotides.  
+**Unit:** fraction  
+**Direction/interpretation:** Larger values mean more matched viral sequence opportunity for the group.  
+**Aggregation:** Calculated per sample-virus before sample/dataset medians.  
+**Evidence class:** Matched-background expectation.  
+**Limitation:** It corrects viral sequence opportunity, not library-preparation bias.
+
+### `grouped_representation_enrichment`
+
+**Class:** Pair-level grouped representation ratio  
+**Definition:** `grouped_observed_fraction / grouped_expected_fraction`; `NA` when the expected fraction is zero or undefined.  
+**Unit:** ratio  
+**Direction/interpretation:** Above `1` is over-representation; below `1` is under-representation relative to matched opportunity.  
+**Aggregation:** Pair metric → within-sample median → across-sample median.  
+**Evidence class:** Representation association.  
+**Limitation:** No pseudocount; not an efficacy fold-change.
+
+### `grouped_representation_delta`
+
+**Class:** Pair-level grouped representation difference  
+**Definition:** `grouped_observed_fraction - grouped_expected_fraction`.  
+**Unit:** fraction / percentage-point composition difference  
+**Direction/interpretation:** Positive is observed excess; negative is observed depletion.  
+**Aggregation:** Pair metric → within-sample median → across-sample median.  
+**Evidence class:** Representation association and sign-test endpoint.  
+**Limitation:** Does not identify the biological cause of representation.
+
+### `grouped_accumulation_ratio`
+
+**Class:** Pair-level grouped accumulation ratio  
+**Definition:** Abundance-weighted grouped observed fraction divided by unique-sequence grouped observed fraction; `NA` when the unique denominator is zero or undefined.  
+**Unit:** ratio  
+**Direction/interpretation:** Above `1` means the group contributes disproportionate abundance relative to observed sequence diversity.  
+**Aggregation:** Pair metric → within-sample median → across-sample median.  
+**Evidence class:** Accumulation association.  
+**Limitation:** Not RNAi efficacy and not molecular abundance relative to an external standard.
+
+### `grouped_accumulation_delta`
+
+**Class:** Pair-level grouped accumulation difference  
+**Definition:** Abundance-weighted grouped observed fraction minus unique-sequence grouped observed fraction.  
+**Unit:** fraction / percentage-point composition difference  
+**Direction/interpretation:** Positive denotes disproportionate high-copy representation; negative denotes depletion among high-copy sequences.  
+**Aggregation:** Pair metric → within-sample median → across-sample median.  
+**Evidence class:** Accumulation association and sign-test endpoint.  
+**Limitation:** Does not establish stability, loading, slicing, or efficacy.
+
+### `cross_length_same_3p`
+
+**Class:** Descriptive cross-length evidence relation  
+**Definition:** Links 23-nt and 24-nt single-nucleotide results with the same physical 3′-relative coordinate, nucleotide, and endpoint. An internal supported match additionally requires concordant effect direction and existing `BY < 0.05` in both lengths.  
+**Unit:** paired evidence record  
+**Direction/interpretation:** Describes cross-length concordance without creating a combined score.  
+**Aggregation:** Across-dataset Stage 07 summary rows.  
+**Evidence class:** Post-hoc positional synthesis.  
+**Limitation:** Terminal positions retain their existing terminal-analysis status and do not enter a new discovery family.
+
+### `cross_length_same_5p`
+
+**Class:** Descriptive cross-length evidence relation  
+**Definition:** Links 23-nt and 24-nt single-nucleotide results with the same physical 5′-relative coordinate, nucleotide, and endpoint, using the same internal-support rule as `cross_length_same_3p`.  
+**Unit:** paired evidence record  
+**Direction/interpretation:** Describes cross-length concordance without creating a combined score.  
+**Aggregation:** Across-dataset Stage 07 summary rows.  
+**Evidence class:** Post-hoc positional synthesis.  
+**Limitation:** The 5′ and 3′ tables are alternative coordinate alignments, not independent tests.
+
+### `feature_evidence_status`
+
+**Class:** Evidence-management category  
+**Allowed values:** `CARRY_FORWARD_HIGH`, `CARRY_FORWARD_SUPPORTIVE`, `CONTEXT_ONLY`, `NOT_DEFAULT`.  
+**Definition:** Rule-derived qualitative status based on corrected cross-length evidence, endpoint, external-prior metadata, and whether the feature is compact or broad.  
+**Unit:** categorical  
+**Direction/interpretation:** Controls eligibility for later evaluation, not magnitude or quality on a numerical scale.  
+**Aggregation:** One record per predefined synthesis feature group.  
+**Evidence class:** Post-hoc evidence synthesis.  
+**Limitation:** Categories are not weights, scores, ranks, or independent validation.
+
+### `stage09_default_include`
+
+**Class:** Later-evaluation eligibility flag  
+**Definition:** `TRUE` only when `feature_evidence_status` is `CARRY_FORWARD_HIGH` or `CARRY_FORWARD_SUPPORTIVE`; otherwise `FALSE`.  
+**Unit:** Boolean  
+**Direction/interpretation:** `TRUE` permits explicit Stage 09 evaluation of correlation, redundancy, antagonism, and incremental information.  
+**Aggregation:** One flag per predefined synthesis feature group.  
+**Evidence class:** Evidence-management decision.  
+**Limitation:** It does not accept a feature as a scoring term or assign any weight.
 
 
 # 31. Stage 08 generic candidate-biophysics definitions

@@ -1,8 +1,8 @@
 # Canonical Varroa vsiRNA Pipeline Specification
 
-**Specification version:** 0.16  
-**Status:** Stages 00–06 implemented and validated; Stage 07 single-nucleotide empirical analysis implemented and validated, with the v0.16 fixed-width regional-GC extension scientifically specified pending implementation; Stage 08 candidate biophysics pre-specified and deferred until Stage 07 completion  
-**Scope:** Viral small-RNA analysis, generic transcript candidate preparation, Stage 07 single-nucleotide and fixed-width regional-GC empirical guide-sequence association analysis, and pre-specified Stage 08 candidate biophysics  
+**Specification version:** 0.17  
+**Status:** Stages 00–06 implemented and validated; Stage 07 single-nucleotide, fixed-width regional-GC, and post-hoc feature-synthesis analyses implemented and validated; Stage 08 candidate biophysics pre-specified and deferred  
+**Scope:** Viral small-RNA analysis, generic transcript candidate preparation, Stage 07 single-nucleotide, fixed-width regional-GC, and feature-synthesis empirical guide-sequence association analysis, and pre-specified Stage 08 candidate biophysics  
 **Host transitivity:** Excluded  
 **Candidate ranking:** Excluded through Stage 08
 
@@ -5218,6 +5218,72 @@ Any later choice of a named empirical feature must document:
 No predictive train/test model is part of canonical Stage 07 v1.
 
 A regularized multivariable predictive model may be considered later only if the transparent single-position analysis identifies sufficiently stable signal and a clear prediction target is defined.
+
+---
+
+## 07.36 Feature synthesis / literature-guided exploratory extension
+
+This extension is a **post-hoc evidence-management synthesis** because the canonical Stage 07 dataset had already been inspected. It is not independent validation and does not rerun the full positional or regional analyses.
+
+The extension reads the existing canonical Stage 07 pair-level positional, across-dataset positional, fixed-width regional-GC, and QC tables as immutable inputs. It records their identities and summarizes the existing A/C/G/U evidence in both physical 5′-relative and physical 3′-relative coordinates.
+
+Three grouped guide-position features from Wang & Bartel (2024; DOI `10.1016/j.molcel.2024.06.026`) are evaluated:
+
+```text
+W7  = A/U at physical guide position 7
+R10 = A/G at physical guide position 10
+W17 = A/U at physical guide position 17
+```
+
+Canonical TSVs use `T` for RNA `U`, so the implemented groups are `A+T`, `A+G`, and `A+T`, respectively. Grouped fractions are calculated at the sample-virus level from the constituent nucleotide fractions before aggregation. The hierarchy remains:
+
+```text
+sample-virus grouped metric
+-> median across viruses within sample
+-> median across samples
+```
+
+Inference uses the existing Stage 07 sample-clustered percentile bootstrap and exact two-sided sign test. The antisense Wang/Bartel family contains exactly 18 tests:
+
+```text
+3 features × 2 lengths × 3 endpoints
+```
+
+Benjamini-Hochberg correction is applied across those 18 tests; sense is retained only as a descriptive comparator.
+
+The existing six-nucleotide regional-GC scan is reused without testing other widths. Physical guide region 3p5–10 corresponds to positions 14–19 in 23-nt guides and 15–20 in 24-nt guides. Cross-length positional support requires the same nucleotide, endpoint, relevant 5′- or 3′-relative coordinate, effect direction, and existing `BY < 0.05` support in both lengths for internal positions.
+
+Evidence-management status is calculated from the observed evidence and explicit prior/scope metadata using only:
+
+```text
+CARRY_FORWARD_HIGH
+CARRY_FORWARD_SUPPORTIVE
+CONTEXT_ONLY
+NOT_DEFAULT
+```
+
+These categories are **not scores, weights, bonuses, penalties, ranks, or efficacy estimates**.
+
+With the canonical calculations reproduced, the default feature set eligible for explicit Stage 09 evaluation is:
+
+```text
+A at physical guide 3p3
+guide 3p5–10 GC/AU composition
+W17
+R10
+```
+
+The broad early/central G-rich pattern is `CONTEXT_ONLY`; W7 is `NOT_DEFAULT`. Stage 09 must evaluate correlation, redundancy, antagonism, and incremental information before combining or weighting any features.
+
+Total-small-RNA representation or accumulation does not establish AGO loading, slicing efficacy, Dicer preference, RdRP preference, or RNAi efficacy. Every synthesis feature remains `scoring_feature = NO`.
+
+Canonical synthesis outputs are written only under:
+
+```text
+results/07_empirical_sequence/feature_synthesis/
+```
+
+and comprise grouped Wang/Bartel sample and summary tables, physical 3′- and 5′-aligned cross-length tables, a six-row feature-evidence table, a concise digest, and synthesis QC.
 
 ---
 
