@@ -18,6 +18,7 @@ include: "workflow/rules/stage06.smk"
 include: "workflow/rules/stage07.smk"
 include: "workflow/rules/stage08.smk"
 include: "workflow/rules/stage09a.smk"
+include: "workflow/rules/stage09bc.smk"
 
 
 rule all:
@@ -127,3 +128,11 @@ rule all:
         "results/09_feature_layers/09A_layer1_accumulation/candidate_layer1.tsv",
         "results/09_feature_layers/stage09_parameters.tsv",
         "results/09_feature_layers/stage09_qc.tsv",
+        "results/09_feature_layers/09B_layer2_guide_competence/candidate_layer2.tsv",
+        "results/09_feature_layers/09B_layer2_guide_competence/layer2_weight_sensitivity_23nt.tsv",
+        "results/09_feature_layers/09B_layer2_guide_competence/layer2_weight_sensitivity_24nt.tsv",
+        "results/09_feature_layers/09B_layer2_guide_competence/layer2_correlations.tsv",
+        "results/09_feature_layers/09C_layer3_target_engagement/candidate_layer3.tsv",
+        "results/09_feature_layers/09C_layer3_target_engagement/layer3_weight_sensitivity_23nt.tsv",
+        "results/09_feature_layers/09C_layer3_target_engagement/layer3_weight_sensitivity_24nt.tsv",
+        "results/09_feature_layers/09C_layer3_target_engagement/layer3_correlations.tsv",
